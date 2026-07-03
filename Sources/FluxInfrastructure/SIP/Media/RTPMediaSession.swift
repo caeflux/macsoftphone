@@ -227,28 +227,35 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
     // MARK: - Áudio
 
     private func startAudioEngine() throws {
+        // Voice processing habilitado: tenta o engine com VPIO; QUALQUER
+        // falha descarta esse engine INTEIRO e reconstrói um limpo, sem
+        // processamento — o caminho validado em campo. Nunca seguir com um
+        // engine meio-configurado (entrada VPIO + saída normal = mudez).
+        if processing.voiceProcessing {
+            do {
+                try startEngine(voiceProcessing: true)
+                return
+            } catch {
+                AppLog.audio.error(
+                    "Voice processing falhou; reconstruindo engine sem processamento: \(String(describing: error), privacy: .public)"
+                )
+            }
+        }
+        try startEngine(voiceProcessing: false)
+    }
+
+    private func startEngine(voiceProcessing: Bool) throws {
         let engine = AVAudioEngine()
         let input = engine.inputNode
 
-        // Voice Processing I/O (cancelamento de eco + supressão de ruído):
-        // precisa ser habilitado ANTES de ler formatos/instalar taps — o
-        // sistema troca a unidade de I/O e os formatos mudam. Entrada e saída
-        // habilitadas em par (o AEC referencia o áudio reproduzido). Falha
-        // aqui NÃO derruba a chamada: segue sem processamento, com log — o
-        // áudio validado em campo é o plano B, nunca o silêncio.
-        if processing.voiceProcessing {
-            do {
-                try input.setVoiceProcessingEnabled(true)
-                try engine.outputNode.setVoiceProcessingEnabled(true)
-                input.isVoiceProcessingAGCEnabled = processing.autoGainControl
-                AppLog.audio.info(
-                    "Voice processing ativo (AEC+NS; AGC \(self.processing.autoGainControl ? "on" : "off", privacy: .public))"
-                )
-            } catch {
-                AppLog.audio.error(
-                    "Voice processing indisponível; seguindo sem AEC/NS: \(String(describing: error), privacy: .public)"
-                )
-            }
+        // Habilitado ANTES de ler formatos/instalar taps — o VPIO troca a
+        // unidade de I/O e os formatos mudam. Entrada e saída em par (o AEC
+        // referencia o áudio reproduzido pelo próprio engine). Qualquer
+        // throw sobe para o chamador reconstruir do zero.
+        if voiceProcessing {
+            try input.setVoiceProcessingEnabled(true)
+            try engine.outputNode.setVoiceProcessingEnabled(true)
+            input.isVoiceProcessingAGCEnabled = processing.autoGainControl
         }
 
         let inputFormat = input.outputFormat(forBus: 0)
@@ -286,6 +293,11 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
         }
         self.engine = engine
         self.sourceNode = source
+        // Evidência para depuração em campo: modo + formato real da entrada
+        // (o VPIO costuma trocar taxa/canais).
+        AppLog.audio.info(
+            "Engine de áudio ativo — VP \(voiceProcessing ? "ligado" : "desligado", privacy: .public), entrada \(Int(inputFormat.sampleRate), privacy: .public) Hz/\(inputFormat.channelCount, privacy: .public)ch"
+        )
     }
 
     private func captureAndConvert(

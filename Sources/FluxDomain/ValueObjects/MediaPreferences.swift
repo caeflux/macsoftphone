@@ -41,11 +41,13 @@ public struct MediaPreferences: Equatable, Sendable {
         self.autoGainControlEnabled = autoGainControlEnabled
     }
 
-    /// Padrão comercial: eco/ruído tratados (softphone usado em alto-falante
-    /// é rotina em escritório) e PCMA primeiro (padrão nos PABX do mercado).
+    /// Padrão: PCMA primeiro (padrão nos PABX do mercado) e processamento de
+    /// voz DESLIGADO — teste de campo (2026-07-03) teve chamada muda com o
+    /// VPIO ligado por padrão; até validar em campo, o caminho de áudio
+    /// padrão é o da V1 e o AEC/NS é opt-in nos Ajustes.
     public static let standard = MediaPreferences(
         preferredCodec: .pcma,
-        voiceProcessingEnabled: true,
+        voiceProcessingEnabled: false,
         autoGainControlEnabled: true
     )
 }

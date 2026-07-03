@@ -81,7 +81,7 @@ struct SettingsView: View {
         // AGC faz parte do processamento de voz — sem ele, não há o que ligar.
         .disabled(!appState.mediaPreferences.voiceProcessingEnabled)
 
-        Text("O codec preferido é anunciado primeiro ao PABX (a central decide). Eco, ruído e ganho usam o processamento de voz do macOS. Alterações valem a partir da próxima chamada.")
+        Text("O codec preferido é anunciado primeiro ao PABX (a central decide). Eco, ruído e ganho usam o processamento de voz do macOS (em validação — se o áudio falhar, desligue). Alterações valem a partir da próxima chamada.")
             .font(.caption)
             .foregroundStyle(.secondary)
     }

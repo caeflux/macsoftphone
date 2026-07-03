@@ -22,7 +22,9 @@ struct MediaPreferencesStoreTests {
 
         #expect(store.load() == .standard)
         #expect(store.load().preferredCodec == .pcma)
-        #expect(store.load().voiceProcessingEnabled)
+        // VP desligado por padrão até validação em campo (chamada muda no
+        // teste de 2026-07-03 com o VPIO ligado).
+        #expect(!store.load().voiceProcessingEnabled)
         #expect(store.load().autoGainControlEnabled)
     }
 

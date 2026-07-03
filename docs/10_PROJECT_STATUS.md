@@ -343,6 +343,27 @@ Primeira etapa funcional da V2 (Ajustes → Áudio):
 - Pendente de validação em campo: qualidade do AEC/NS contra PABX real em
   alto-falante (teste unitário não cobre acústica).
 
+### Incidente no teste de campo (mesmo dia): chamada muda com VP ligado
+
+Primeira chamada com o Voice Processing LIGADO POR PADRÃO ficou muda (sem
+ringback, sem áudio nos dois sentidos). Causas prováveis: (a) o bloco de
+ativação seguia com engine MEIO-CONFIGURADO se a entrada ativasse e a saída
+falhasse (entrada VPIO + saída normal = mudez); (b) VPIO pode não funcionar
+em qualquer combinação de hardware/dispositivo mesmo "ativando com sucesso".
+
+Correções:
+- Falha em QUALQUER passo do VP descarta o engine inteiro e reconstrói um
+  limpo no caminho validado da V1 (nunca híbrido).
+- Padrão voltou a DESLIGADO (`MediaPreferences.standard`) — AEC/NS é opt-in
+  nos Ajustes até ser validado em campo; a UI avisa "em validação".
+- Log do modo + formato de entrada no start do engine, para depuração.
+- Lição de processo: recurso que altera o caminho de áudio validado NUNCA
+  entra ligado por padrão antes do teste de campo (docs/00: estabilidade é
+  a prioridade nº 1).
+
+Nota: o ringback da V1 vem em banda (após o 200); a engine não reproduz
+early media (183 com SDP) — suporte a early media fica como evolução futura.
+
 ## Próximo ciclo
 
 1. **Validar em campo**: chamada de entrada (celular → ramal do app) e DTMF contra URA real (ex.: ligar para o atendimento e navegar o menu).

@@ -114,13 +114,17 @@ do `AVAudioEngine` — o AEC referencia o áudio reproduzido pelo próprio
 engine). AGC é flag separada (`isVoiceProcessingAGCEnabled`).
 
 - Configurável por `AudioProcessingOptions` na criação do `RTPMediaSession`
-  (por chamada, via `mediaFactory` na composição). Padrão do produto: LIGADO
-  (softphone em alto-falante é rotina B2B); padrão do `init` sem opções:
-  desligado (comportamento validado em campo — usado nos testes).
+  (por chamada, via `mediaFactory` na composição). Padrão: DESLIGADO —
+  opt-in nos Ajustes. (Era ligado por padrão; teste de campo em 2026-07-03
+  teve chamada MUDA — ver incidente em docs/10. Religa por padrão só depois
+  de validado em campo.)
 - Habilitado ANTES de ler formatos/instalar taps — o VPIO troca a unidade de
   I/O e os formatos mudam; o conversor de 8 kHz absorve qualquer taxa.
-- Falha ao habilitar NÃO derruba a chamada: log em `AppLog.audio` e a mídia
-  segue sem processamento (o plano B é o áudio validado, nunca o silêncio).
+- Falha ao habilitar NÃO derruba a chamada nem segue meio-configurada: o
+  engine com VP é descartado INTEIRO e um engine limpo (caminho V1) é
+  reconstruído. Entrada VPIO + saída normal = mudez — nunca deixar híbrido.
+- O start do engine loga modo + formato de entrada em `AppLog.audio` —
+  evidência para depurar áudio em campo.
 - AEC+NS são um recurso único do sistema — a UI expõe um só toggle para os
   dois, mais o toggle de AGC (honestidade sobre o que o sistema oferece).
 
