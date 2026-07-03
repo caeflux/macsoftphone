@@ -4,11 +4,13 @@ import SwiftUI
 struct FluxSoftphoneApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppComposition.makeAppState()
+    @StateObject private var themeStore = AppComposition.makeThemeStore()
 
     var body: some Scene {
         WindowGroup {
             MainView()
                 .environmentObject(appState)
+                .environmentObject(themeStore)
                 .task { appState.start() }
                 // O tema white label define apenas paleta clara; sem forçar
                 // a aparência, o dark mode do sistema pinta textos padrão de
@@ -17,6 +19,13 @@ struct FluxSoftphoneApp: App {
                 .preferredColorScheme(.light)
         }
         .defaultSize(width: 980, height: 660)
+        // A janela segue as restrições do conteúdo: no modo compacto trava
+        // no tamanho do "aparelho"; no completo, respeita os mínimos e cresce.
+        .windowResizability(.contentSize)
+        // Sem barra de título: no modo compacto a janela é transparente e só
+        // o "aparelho" aparece (a faixa de título pintaria um retângulo no
+        // topo); no completo, a toolbar unificada segue normal, sem o texto.
+        .windowStyle(.hiddenTitleBar)
     }
 }
 

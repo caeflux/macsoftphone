@@ -249,6 +249,79 @@ Pendências: DTMF recebido (URA raramente exige, telefone físico→app é raro)
 
 Refinamento por feedback do usuário (mesmo dia): **teclado único, modo contextual** — em vez de um teclado DTMF separado na barra de chamada, o próprio DISCADOR envia DTMF quando a chamada está ativa (botões e teclado físico; dígitos enviados exibidos; backspace desabilitado — dígito enviado é enviado; o número discado fica intacto). O botão de grade na barra de chamada virou atalho para a seção Discador. `DTMFPadView` removido.
 
+## Editor white label + glassmorphism — 2026-07-02
+
+Etapa visual sobre a V1 comercial (branch `feature/white-label-theme-editor`).
+Nenhuma linha de SIP/áudio/chamadas/histórico foi alterada.
+
+- **`WhiteLabelTheme` + `ThemeStore`** (FluxWhiteLabel): tema editável em
+  runtime com persistência JSON no container da marca e imagens (logo/fundo)
+  como arquivos relativos. Decodificação tolerante, validação de cores,
+  export/import JSON pronto (API; UI futura). Fallback garantido: sem arquivo
+  ou corrompido → tema padrão derivado do `brand-config.json`.
+- **Seção "Aparência"** (`BrandingSettingsView`): nome da marca, logo
+  (fileImporter, limite 20 MB), 4 ColorPickers, fundo sólido/gradiente (2–3
+  cores)/imagem, sliders de opacidade do vidro, desfoque do fundo e raio dos
+  cantos, aviso de contraste baixo (não bloqueante) e restaurar padrão com
+  confirmação. Preview em tempo real (`ThemePreviewView`) lê o mesmo store.
+- **Glassmorphism**: `GlassPhoneShell` (corpo de smartphone flutuante — o
+  discador vive dentro dele), `GlassCard` (visão geral), `ThemedBackgroundView`
+  (fundo por estilo, com blur configurável), `BrandLogoView` (logo custom com
+  fallback na inicial sobre a cor primária).
+- **Aplicação do tema**: `resolvedBrandTheme(base:)` projeta as cores custom
+  sobre o `BrandTheme` — views seguem consumindo `BrandTheme`; patch de 2–3
+  linhas por view (Dialer/Overview/MainView/ActiveCallBar/IncomingCallOverlay/
+  History/Settings). Cores semânticas de chamada permanecem fixas.
+- 124 testes (21 novos: modelo, resolução, clamps, store, imagens,
+  export/import). Verificado ao vivo: edição reflete no preview e na UI na
+  hora, JSON persistido em disco, restaurar padrão funciona.
+- Nota de dev: rebuild ad-hoc muda a identidade do binário → Keychain nega a
+  conta salva na primeira abertura ("Não foi possível carregar a conta salva")
+  — comportamento já documentado, resolve-se com Developer ID no Ciclo 12.
+
+## Modo compacto — 2026-07-02
+
+Feedback direto do usuário na mesma etapa: depois de registrado e
+personalizado, o app deve poder "virar" só o discador personalizado.
+
+- **`CompactModeView`**: a janela vira o "aparelho" (420×640, tamanho fixo via
+  `.windowResizability(.contentSize)`) — só o discador temático no shell de
+  vidro. Reusa DialerView/ActiveCallBar/IncomingCallOverlay: chamada continua
+  100% controlável (atender, recusar, mute, DTMF, encerrar) no modo compacto.
+- **Alternância**: botão na toolbar (modo completo → compacto), botão de
+  expandir no canto do aparelho (compacto → completo), atalho ⇧⌘M nos dois
+  sentidos. Preferência persistida (`@AppStorage "ui.compact-mode"`) — quem usa
+  o app como aparelho reabre direto no aparelho.
+- Verificado ao vivo nos dois sentidos; janela encolhe/cresce corretamente.
+
+Refinamento por feedback do usuário (2026-07-03): **sem moldura quadrada** —
+no modo compacto a janela é transparente e sem título (`WindowChromeConfigurator`
++ `.windowStyle(.hiddenTitleBar)`); só o aparelho arredondado flutua no desktop,
+com o fundo do tema DENTRO do corpo (`GlassPhoneShell.embedsThemedBackdrop`).
+Aprendizados de AppKit que viraram regra no código:
+
+- `isMovableByWindowBackground` com NSHostingView engole TODOS os cliques como
+  arrasto de janela (teclado do discador morto) — nunca usar; o arrasto é uma
+  alça explícita no header do aparelho (`WindowDragHandle` + `performDrag`).
+- A sombra da NSWindow desenha o contorno do retângulo transparente —
+  `hasShadow = false` no compacto (a sombra é do shell, via SwiftUI).
+- Launch direto no modo compacto herda chrome restaurado da sessão anterior
+  (faixa de titlebar) — `.hiddenTitleBar` na cena resolve na criação da janela;
+  o véu do overlay de chamada recebida vira quadrado sobre o desktop em janela
+  transparente (`IncomingCallOverlay(showsBackdrop: false)` no compacto).
+
+## Bug de release V1 corrigido: brand-config fora do .app — 2026-07-03
+
+Descoberto ao repackagear durante esta etapa: o acessor `Bundle.module` gerado
+pelo SwiftPM procura o bundle de recursos APENAS na raiz do executável e no
+caminho absoluto de `.build` DA MÁQUINA DE DEV — nunca em `Contents/Resources`.
+O `.app` da V1 só carregava a marca Flux porque rodava na máquina de
+desenvolvimento; em qualquer outro Mac abriria com fallback neutro ou
+`fatalError`. Correção: `BrandLoader.brandResourceBundle()` resolve o bundle
+explicitamente (Contents/Resources → diretório do executável → contexto de
+testes), sem `Bundle.module`, falhando gracioso (fallback neutro). Verificado
+com o bundle de `.build` renomeado: o `.app` carrega a marca do próprio pacote.
+
 ## Próximo ciclo
 
 1. **Validar em campo**: chamada de entrada (celular → ramal do app) e DTMF contra URA real (ex.: ligar para o atendimento e navegar o menu).

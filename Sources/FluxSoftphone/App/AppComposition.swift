@@ -25,6 +25,17 @@ enum AppComposition {
         )
     }
 
+    /// Store do tema white label editável, persistido dentro do container
+    /// da marca (`…/<brandId>/theme/`). Injetado como EnvironmentObject —
+    /// a UI reage a edições em tempo real (docs/02_WHITE_LABEL_SYSTEM.md).
+    static func makeThemeStore() -> ThemeStore {
+        let brand = loadBrand()
+        return ThemeStore(
+            directory: dataDirectory(for: brand).appendingPathComponent("theme", isDirectory: true),
+            defaultTheme: .defaultTheme(for: brand)
+        )
+    }
+
     /// `Application Support/<bundle>/<brandId>/` — dados locais separados
     /// por marca, como as credenciais (docs/05_SECURITY_PRIVACY.md).
     private static func dataDirectory(for brand: BrandConfig) -> URL {
@@ -61,16 +72,23 @@ enum AppComposition {
         return "\(base).\(brand.brandId).sip-account"
     }
 
+    /// Cache da marca: `makeAppState` e `makeThemeStore` precisam da MESMA
+    /// configuração — carregar duas vezes poderia divergir em erro parcial.
+    private static var cachedBrand: BrandConfig?
+
     private static func loadBrand() -> BrandConfig {
+        if let cachedBrand { return cachedBrand }
+        let brand: BrandConfig
         do {
-            let brand = try BrandLoader.loadBundled()
+            brand = try BrandLoader.loadBundled()
             AppLog.whiteLabel.info("Marca carregada: \(brand.brandId, privacy: .public)")
-            return brand
         } catch {
             AppLog.whiteLabel.error(
                 "Falha ao carregar brand-config embarcado; usando fallback neutro: \(String(describing: error), privacy: .public)"
             )
-            return .neutralFallback
+            brand = .neutralFallback
         }
+        cachedBrand = brand
+        return brand
     }
 }

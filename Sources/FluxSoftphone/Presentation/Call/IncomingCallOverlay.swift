@@ -6,14 +6,22 @@ import FluxWhiteLabel
 /// só sai atendendo, recusando ou quando o chamador desiste (perdida).
 struct IncomingCallOverlay: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var themeStore: ThemeStore
     let call: CallSession
+    /// No modo compacto (janela transparente) o véu escuro retangular viraria
+    /// um quadrado flutuando no desktop — lá o cartão aparece sozinho.
+    var showsBackdrop = true
 
-    private var theme: BrandTheme { appState.brand.theme }
+    private var theme: BrandTheme {
+        themeStore.theme.resolvedBrandTheme(base: appState.brand.theme)
+    }
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.35)
-                .ignoresSafeArea()
+            if showsBackdrop {
+                Color.black.opacity(0.35)
+                    .ignoresSafeArea()
+            }
 
             VStack(spacing: 18) {
                 Image(systemName: "phone.arrow.down.left.fill")

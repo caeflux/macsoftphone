@@ -21,6 +21,7 @@ struct HistoryView: View {
     }
 
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var themeStore: ThemeStore
     @State private var filter: HistoryFilter = .all
     @State private var isConfirmingClear = false
 
@@ -48,7 +49,10 @@ struct HistoryView: View {
                 emptyState
             } else {
                 List(filteredEntries) { entry in
-                    HistoryRow(entry: entry, theme: appState.brand.theme) {
+                    HistoryRow(
+                        entry: entry,
+                        theme: themeStore.theme.resolvedBrandTheme(base: appState.brand.theme)
+                    ) {
                         appState.redial(entry)
                     }
                 }

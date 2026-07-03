@@ -7,6 +7,7 @@ enum MainSection: String, CaseIterable, Identifiable {
     case dialer
     case history
     case settings
+    case branding
     case diagnostics
 
     var id: String { rawValue }
@@ -17,6 +18,7 @@ enum MainSection: String, CaseIterable, Identifiable {
         case .dialer: return "Discador"
         case .history: return "Histórico"
         case .settings: return "Ajustes"
+        case .branding: return "Aparência"
         case .diagnostics: return "Diagnóstico"
         }
     }
@@ -27,6 +29,7 @@ enum MainSection: String, CaseIterable, Identifiable {
         case .dialer: return "circle.grid.3x3.fill"
         case .history: return "clock.arrow.circlepath"
         case .settings: return "gearshape"
+        case .branding: return "paintbrush"
         case .diagnostics: return "waveform.path.ecg"
         }
     }
@@ -34,6 +37,10 @@ enum MainSection: String, CaseIterable, Identifiable {
 
 struct MainView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var themeStore: ThemeStore
+    /// Modo compacto: a janela vira só o discador personalizado. Persistido —
+    /// quem usa o app como "aparelho" reabre direto no aparelho.
+    @AppStorage("ui.compact-mode") private var isCompactMode = false
 
     /// Seções visíveis respeitam as feature flags da marca.
     private var visibleSections: [MainSection] {
@@ -41,12 +48,29 @@ struct MainView: View {
             switch section {
             case .history: return appState.brand.features.callHistory
             case .diagnostics: return appState.brand.features.diagnostics
-            case .overview, .dialer, .settings: return true
+            case .overview, .dialer, .settings, .branding: return true
             }
         }
     }
 
+    /// Nome exibido: o do tema white label, com fallback no da marca.
+    private var displayName: String {
+        themeStore.theme.displayBrandName(fallback: appState.brand.appName)
+    }
+
     var body: some View {
+        if isCompactMode {
+            CompactModeView(isCompactMode: $isCompactMode)
+                .navigationTitle(displayName)
+                // Janela transparente: só o aparelho aparece, sem moldura.
+                .background(WindowChromeConfigurator(isCompact: true))
+        } else {
+            fullModeBody
+                .background(WindowChromeConfigurator(isCompact: false))
+        }
+    }
+
+    private var fullModeBody: some View {
         NavigationSplitView {
             sidebar
         } detail: {
@@ -59,14 +83,24 @@ struct MainView: View {
                     }
                 }
         }
-        .navigationTitle(appState.brand.appName)
+        .navigationTitle(displayName)
         .frame(minWidth: 760, minHeight: 520)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RegistrationStatusBadge(
                     state: appState.registrationState,
-                    theme: appState.brand.theme
+                    theme: themeStore.theme.resolvedBrandTheme(base: appState.brand.theme)
                 )
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isCompactMode = true
+                } label: {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                }
+                .keyboardShortcut("m", modifiers: [.command, .shift])
+                .help("Modo compacto — só o discador (⇧⌘M)")
+                .accessibilityLabel("Entrar no modo compacto")
             }
         }
         .overlay {
@@ -90,7 +124,7 @@ struct MainView: View {
     /// Identificação discreta da marca no rodapé da sidebar.
     private var sidebarFooter: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(appState.brand.appName)
+            Text(displayName)
                 .font(.caption.weight(.semibold))
             if !appState.brand.companyName.isEmpty {
                 Text(appState.brand.companyName)
@@ -114,6 +148,8 @@ struct MainView: View {
             HistoryView()
         case .settings:
             SettingsView()
+        case .branding:
+            BrandingSettingsView()
         case .diagnostics:
             DiagnosticsView()
         }

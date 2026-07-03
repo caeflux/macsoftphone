@@ -108,6 +108,31 @@ As features devem ser lidas de configuração:
 - `autoUpdate`
 - `diagnostics`
 
+## Tema editável em runtime (etapa white label — 2026-07)
+
+Além do `brand-config.json` embarcado (identidade da marca por build), existe uma
+camada de personalização editável em runtime:
+
+- **Modelo**: `WhiteLabelTheme` (`Sources/FluxWhiteLabel/WhiteLabelTheme.swift`) —
+  nome da marca, logo, cores (primária/secundária/destaque/texto), fundo
+  (sólido/gradiente 2–3 cores/imagem), opacidade do vidro, desfoque do fundo e
+  raio dos cantos. Codable tolerante (campo ausente cai no padrão) e validável.
+- **Persistência**: `ThemeStore` (`Sources/FluxWhiteLabel/ThemeStore.swift`) —
+  JSON legível em `Application Support/<bundle>/<brandId>/theme/white-label-theme.json`;
+  logo e imagem de fundo como arquivos ao lado, referenciados por nome relativo.
+  Arquivo corrompido/ausente cai no tema padrão derivado do `brand-config.json`.
+- **Editor**: seção "Aparência" (`BrandingSettingsView`) com preview em tempo
+  real (`ThemePreviewView`) e botão de restaurar padrão.
+- **Aplicação**: `WhiteLabelTheme.resolvedBrandTheme(base:)` projeta as cores
+  customizadas sobre o `BrandTheme` embarcado — as views continuam consumindo
+  `BrandTheme`. Cores semânticas (sucesso/aviso/perigo) NÃO são personalizáveis:
+  verde de atender e vermelho de encerrar são convenção de telefonia.
+- **Visual**: `GlassPhoneShell`/`GlassCard`/`ThemedBackgroundView`/`BrandLogoView`
+  aplicam o glassmorphism; o discador vive dentro do shell em formato smartphone.
+- **Export/import**: `ThemeStore.exportThemeJSON()`/`importTheme(from:)` são o
+  contrato JSON para distribuir temas por tenant (UI de export/import é etapa
+  futura; imagens não vão no export v1).
+
 ## Critério de aceite
 
 É possível alterar nome, logo, cor primária e domínio SIP padrão modificando apenas arquivos de configuração/assets, sem mexer em lógica de chamada.

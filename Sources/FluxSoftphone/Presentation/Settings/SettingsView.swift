@@ -1,10 +1,12 @@
 import SwiftUI
 import FluxDomain
+import FluxWhiteLabel
 
 /// Ajustes agrupados (docs/04_UI_UX_GUIDELINES.md): Conta SIP, Áudio e Sobre.
 /// Áudio e Diagnóstico ganham conteúdo real nos Ciclos 9 e 11.
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var themeStore: ThemeStore
     @State private var isEditingAccount = false
     @State private var isConfirmingRemoval = false
 
@@ -124,7 +126,7 @@ struct SettingsView: View {
                 LabeledContent("Status") {
                     RegistrationStatusBadge(
                         state: appState.registrationState,
-                        theme: appState.brand.theme
+                        theme: themeStore.theme.resolvedBrandTheme(base: appState.brand.theme)
                     )
                 }
 
