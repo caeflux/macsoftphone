@@ -17,37 +17,43 @@ public enum AudioCodecPreference: String, CaseIterable, Codable, Sendable, Ident
     }
 }
 
-/// Preferências de mídia do usuário: ordem de codec na negociação SDP e
-/// processamento de voz (cancelamento de eco, supressão de ruído, ganho).
+/// Preferências de mídia do usuário: ordem de codec na negociação SDP,
+/// cancelamento de eco, supressão de silêncio (VAD) e ganho automático.
 /// Aplicadas na PRÓXIMA chamada — nunca mexem numa chamada em andamento.
 public struct MediaPreferences: Equatable, Sendable {
     /// Codec anunciado primeiro na oferta SDP (o PABX decide respeitando a
     /// ordem). Na resposta, é o escolhido quando o remoto o oferece.
     public var preferredCodec: AudioCodecPreference
-    /// Processamento de voz da Apple (Voice Processing I/O): cancelamento de
-    /// eco acústico + supressão de ruído — um recurso único do sistema.
-    public var voiceProcessingEnabled: Bool
+    /// Cancelamento de eco acústico via Voice Processing I/O da Apple.
+    /// O sistema embute redução de ruído junto — é um recurso único do macOS.
+    public var echoCancellationEnabled: Bool
+    /// Supressão de silêncio (VAD) no ENVIO: quando o usuário não está
+    /// falando, o ruído de fundo não é transmitido (gate de energia local,
+    /// independente do processamento de voz do sistema).
+    public var silenceSuppressionEnabled: Bool
     /// Controle automático de ganho do microfone (parte do Voice Processing;
-    /// sem efeito quando `voiceProcessingEnabled == false`).
+    /// sem efeito quando `echoCancellationEnabled == false`).
     public var autoGainControlEnabled: Bool
 
     public init(
         preferredCodec: AudioCodecPreference,
-        voiceProcessingEnabled: Bool,
+        echoCancellationEnabled: Bool,
+        silenceSuppressionEnabled: Bool,
         autoGainControlEnabled: Bool
     ) {
         self.preferredCodec = preferredCodec
-        self.voiceProcessingEnabled = voiceProcessingEnabled
+        self.echoCancellationEnabled = echoCancellationEnabled
+        self.silenceSuppressionEnabled = silenceSuppressionEnabled
         self.autoGainControlEnabled = autoGainControlEnabled
     }
 
-    /// Padrão = comportamento validado em campo da V1: oferta PCMU primeiro
-    /// e processamento de voz DESLIGADO. Ambos são conscientemente idênticos
-    /// à V1 após os incidentes de chamada muda de 2026-07-03 — qualquer
-    /// desvio do caminho validado é opt-in nos Ajustes até provar-se em campo.
+    /// Padrão = comportamento validado em campo da V1: oferta PCMU primeiro,
+    /// eco e VAD DESLIGADOS. Qualquer desvio do caminho validado é opt-in
+    /// nos Ajustes até provar-se em campo (incidentes de 2026-07-03).
     public static let standard = MediaPreferences(
         preferredCodec: .pcmu,
-        voiceProcessingEnabled: false,
+        echoCancellationEnabled: false,
+        silenceSuppressionEnabled: false,
         autoGainControlEnabled: true
     )
 }

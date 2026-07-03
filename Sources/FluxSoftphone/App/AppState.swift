@@ -189,7 +189,8 @@ final class AppState: ObservableObject {
         mediaPreferencesStore.save(updated)
         diagnosticLog.append(
             "Mídia: codec preferido \(updated.preferredCodec.rawValue.uppercased()), "
-                + "eco/ruído \(updated.voiceProcessingEnabled ? "ligado" : "desligado"), "
+                + "eco \(updated.echoCancellationEnabled ? "ligado" : "desligado"), "
+                + "VAD \(updated.silenceSuppressionEnabled ? "ligado" : "desligado"), "
                 + "AGC \(updated.autoGainControlEnabled ? "ligado" : "desligado") — vale para a próxima chamada"
         )
     }

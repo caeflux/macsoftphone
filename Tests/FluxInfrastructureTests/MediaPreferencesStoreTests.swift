@@ -21,10 +21,11 @@ struct MediaPreferencesStoreTests {
         defer { cleanup(suite) }
 
         #expect(store.load() == .standard)
-        // Padrão = V1 validada em campo: PCMU primeiro na oferta e VP
-        // desligado (incidentes de chamada muda em 2026-07-03).
+        // Padrão = V1 validada em campo: PCMU primeiro na oferta, eco e VAD
+        // desligados (incidentes de chamada muda em 2026-07-03).
         #expect(store.load().preferredCodec == .pcmu)
-        #expect(!store.load().voiceProcessingEnabled)
+        #expect(!store.load().echoCancellationEnabled)
+        #expect(!store.load().silenceSuppressionEnabled)
         #expect(store.load().autoGainControlEnabled)
     }
 
@@ -34,13 +35,27 @@ struct MediaPreferencesStoreTests {
         defer { cleanup(suite) }
 
         let custom = MediaPreferences(
-            preferredCodec: .pcmu,
-            voiceProcessingEnabled: false,
+            preferredCodec: .pcma,
+            echoCancellationEnabled: true,
+            silenceSuppressionEnabled: true,
             autoGainControlEnabled: false
         )
         store.save(custom)
 
         #expect(store.load() == custom)
+    }
+
+    @Test("chave legada do toggle único de voz vira cancelamento de eco")
+    func legacyVoiceProcessingKeyMigratesToEcho() {
+        let (store, suite) = makeStore()
+        defer { cleanup(suite) }
+
+        UserDefaults(suiteName: suite)?.set(true, forKey: "media.voiceProcessingEnabled")
+        #expect(store.load().echoCancellationEnabled)
+
+        // A chave nova, quando existe, tem precedência sobre a legada.
+        UserDefaults(suiteName: suite)?.set(false, forKey: "media.echoCancellationEnabled")
+        #expect(!store.load().echoCancellationEnabled)
     }
 
     @Test("valor de codec desconhecido no defaults cai no padrão")

@@ -51,6 +51,15 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
     /// zero contínuo = microfone entregando silêncio (ex.: TCC bloqueando
     /// um binário re-assinado mesmo com status "Permitida").
     private var capturePeak: Int16 = 0
+    /// VAD do envio: frames restantes de "hangover" — a voz precisa sumir
+    /// por este tempo antes do gate fechar (sem cortar fim de frase).
+    private var vadHangoverFrames = 0
+
+    /// Gate de silêncio: pico abaixo disto (≈1% do fundo de escala) é
+    /// considerado "sem fala".
+    private static let vadThreshold: Int16 = 350
+    /// 15 frames × 20 ms = 300 ms de tolerância após a última fala.
+    private static let vadHangover = 15
 
     private var engine: AVAudioEngine?
     private var sourceNode: AVAudioSourceNode?
@@ -424,6 +433,24 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
             sendBuffer.removeAll()
         } else {
             sendBuffer.read(into: &sendScratch, frameCount: RTPPacket.samplesPerPacket)
+            // Supressão de silêncio (VAD): sem fala há >300 ms, o payload
+            // vira silêncio — o fundo da sala não é transmitido. O pacote
+            // CONTINUA sendo enviado na cadência (NAT e latching do servidor
+            // dependem do fluxo contínuo).
+            if processing.silenceSuppression {
+                var framePeak: Int16 = 0
+                for sample in sendScratch {
+                    let magnitude = sample == .min ? .max : abs(sample)
+                    if magnitude > framePeak { framePeak = magnitude }
+                }
+                if framePeak >= Self.vadThreshold {
+                    vadHangoverFrames = Self.vadHangover
+                } else if vadHangoverFrames > 0 {
+                    vadHangoverFrames -= 1
+                } else {
+                    for index in sendScratch.indices { sendScratch[index] = 0 }
+                }
+            }
         }
         sequenceNumber &+= 1
         timestamp &+= UInt32(RTPPacket.samplesPerPacket)

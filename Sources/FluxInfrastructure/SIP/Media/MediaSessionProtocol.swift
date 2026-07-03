@@ -1,15 +1,23 @@
 import Foundation
 
-/// Processamento de voz aplicado à sessão de mídia (Voice Processing I/O da
-/// Apple). Cancelamento de eco e supressão de ruído são um recurso ÚNICO do
-/// sistema; AGC é uma flag separada dentro dele.
+/// Processamento de áudio aplicado à sessão de mídia.
+/// - `voiceProcessing`: cancelamento de eco via Voice Processing I/O da
+///   Apple (o sistema embute redução de ruído junto); AGC é flag do mesmo.
+/// - `silenceSuppression`: VAD local no ENVIO — ruído de fundo não é
+///   transmitido quando o usuário não fala (independente do VPIO).
 public struct AudioProcessingOptions: Equatable, Sendable {
     public var voiceProcessing: Bool
     public var autoGainControl: Bool
+    public var silenceSuppression: Bool
 
-    public init(voiceProcessing: Bool, autoGainControl: Bool) {
+    public init(
+        voiceProcessing: Bool,
+        autoGainControl: Bool,
+        silenceSuppression: Bool = false
+    ) {
         self.voiceProcessing = voiceProcessing
         self.autoGainControl = autoGainControl
+        self.silenceSuppression = silenceSuppression
     }
 
     /// Sem processamento — comportamento da engine validada em campo.
@@ -17,7 +25,8 @@ public struct AudioProcessingOptions: Equatable, Sendable {
     /// preferência real do usuário.
     public static let disabled = AudioProcessingOptions(
         voiceProcessing: false,
-        autoGainControl: false
+        autoGainControl: false,
+        silenceSuppression: false
     )
 }
 

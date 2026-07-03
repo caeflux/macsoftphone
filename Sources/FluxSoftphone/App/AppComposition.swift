@@ -74,8 +74,9 @@ enum AppComposition {
                 let preferences = mediaPreferencesStore.load()
                 return try RTPMediaSession(
                     processing: AudioProcessingOptions(
-                        voiceProcessing: preferences.voiceProcessingEnabled,
-                        autoGainControl: preferences.autoGainControlEnabled
+                        voiceProcessing: preferences.echoCancellationEnabled,
+                        autoGainControl: preferences.autoGainControlEnabled,
+                        silenceSuppression: preferences.silenceSuppressionEnabled
                     ),
                     // Contadores de RTP na tela de Diagnóstico — evidência
                     // de onde o áudio morre numa chamada muda.

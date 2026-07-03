@@ -70,18 +70,24 @@ struct SettingsView: View {
         }
 
         Toggle(
-            "Cancelamento de eco e supressão de ruído",
-            isOn: mediaBinding(\.voiceProcessingEnabled)
+            "Cancelamento de eco",
+            isOn: mediaBinding(\.echoCancellationEnabled)
+        )
+
+        Toggle(
+            "Supressão de silêncio (VAD)",
+            isOn: mediaBinding(\.silenceSuppressionEnabled)
         )
 
         Toggle(
             "Ganho automático do microfone",
             isOn: mediaBinding(\.autoGainControlEnabled)
         )
-        // AGC faz parte do processamento de voz — sem ele, não há o que ligar.
-        .disabled(!appState.mediaPreferences.voiceProcessingEnabled)
+        // AGC faz parte do processamento de voz do sistema (eco) —
+        // sem ele, não há o que ligar.
+        .disabled(!appState.mediaPreferences.echoCancellationEnabled)
 
-        Text("O codec preferido é anunciado primeiro ao PABX (a central decide) — alguns PABX não aceitam PCMA em primeiro; em caso de mudez, volte para PCMU. Eco, ruído e ganho usam o processamento de voz do macOS (em validação — se o áudio falhar, desligue). Alterações valem a partir da próxima chamada.")
+        Text("O codec preferido é anunciado primeiro ao PABX (a central decide) — alguns PABX não aceitam PCMA em primeiro; em caso de mudez, volte para PCMU. O cancelamento de eco usa o processamento de voz do macOS e embute a redução de ruído do sistema (em validação — se o áudio falhar, desligue). A supressão de silêncio corta o ruído de fundo quando você não está falando. Alterações valem a partir da próxima chamada.")
             .font(.caption)
             .foregroundStyle(.secondary)
     }
