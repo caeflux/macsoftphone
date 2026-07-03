@@ -47,6 +47,10 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
     private var rtpReceived = 0
     private var rtpDroppedOtherPT = 0
     private var lastReceivedPT: Int?
+    /// Pico de amplitude capturado do microfone desde o último relatório —
+    /// zero contínuo = microfone entregando silêncio (ex.: TCC bloqueando
+    /// um binário re-assinado mesmo com status "Permitida").
+    private var capturePeak: Int16 = 0
 
     private var engine: AVAudioEngine?
     private var sourceNode: AVAudioSourceNode?
@@ -344,8 +348,14 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
 
         // Escreve direto do ponteiro no ring buffer — sem alocar array.
         let frames = Int(output.frameLength)
+        var peak: Int16 = 0
+        for index in 0..<frames {
+            let magnitude = channel[index] == .min ? .max : abs(channel[index])
+            if magnitude > peak { peak = magnitude }
+        }
         lock.lock()
         sendBuffer.write(UnsafeBufferPointer(start: channel, count: frames))
+        if peak > capturePeak { capturePeak = peak }
         lock.unlock()
     }
 
@@ -454,6 +464,11 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
                 if self.rtpDroppedOtherPT > 0 {
                     line += ", descartados \(self.rtpDroppedOtherPT)"
                 }
+                // Pico ~0 = microfone entregando silêncio ao engine.
+                line += self.capturePeak > 50
+                    ? "; mic ok (pico \(self.capturePeak))"
+                    : "; MIC EM SILÊNCIO (pico \(self.capturePeak))"
+                self.capturePeak = 0
                 return line
             }
             if let report { self.diagnostics?(report) }
