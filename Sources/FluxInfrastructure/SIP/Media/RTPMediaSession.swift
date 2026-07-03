@@ -152,10 +152,28 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
             running = true
         }
 
-        try startAudioEngine()
+        // Sockets e cadência ANTES do engine: o RTP flui imediatamente
+        // (silêncio até o áudio subir). Atrás de NAT o servidor "aprende"
+        // nosso endereço pelos primeiros pacotes (latching) — o VPIO pode
+        // levar segundos para instanciar e perder essa janela (mudez em
+        // campo com cancelamento de eco ligado: tx ok, rx 0).
         startReceiving()
         startSending()
         startStatsReporting()
+
+        let engineStartedAt = DispatchTime.now()
+        do {
+            try startAudioEngine()
+        } catch {
+            // Sem engine não há chamada: para os timers/sockets antes de
+            // propagar (o chamador encerra com BYE).
+            teardown()
+            throw error
+        }
+        let engineMillis = (DispatchTime.now().uptimeNanoseconds - engineStartedAt.uptimeNanoseconds) / 1_000_000
+        diagnostics?(
+            "engine de áudio pronto em \(engineMillis) ms (eco \(processing.voiceProcessing ? "ligado" : "desligado"))"
+        )
         AppLog.audio.info("Mídia RTP iniciada (porta local \(self.localRTPPort, privacy: .public))")
     }
 
