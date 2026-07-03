@@ -14,3 +14,6 @@ DerivedData/
 *.pem
 *.p12
 *.env
+
+# Instaladores gerados pelo packaging/package-app.sh
+dist/
