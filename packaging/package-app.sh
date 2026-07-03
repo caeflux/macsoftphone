@@ -22,17 +22,24 @@ DIST="dist"
 APP="$DIST/$APP_NAME.app"
 DMG="$DIST/FluxSoftphone-$VERSION.dmg"
 
-echo "== Build release =="
-swift build -c release
+echo "== Build release (universal: arm64 + x86_64) =="
+# Triples explícitos + lipo: `swift build --arch a --arch b` exige o Xcode
+# completo; este caminho funciona só com as Command Line Tools.
+swift build -c release --triple arm64-apple-macosx14.0
+swift build -c release --triple x86_64-apple-macosx14.0
 
 echo "== Montando $APP =="
 rm -rf "$APP" "$DMG"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp packaging/Info.plist "$APP/Contents/Info.plist"
-cp .build/release/FluxSoftphone "$APP/Contents/MacOS/FluxSoftphone"
+lipo -create \
+    .build/arm64-apple-macosx/release/FluxSoftphone \
+    .build/x86_64-apple-macosx/release/FluxSoftphone \
+    -output "$APP/Contents/MacOS/FluxSoftphone"
+lipo -info "$APP/Contents/MacOS/FluxSoftphone"
 # Recursos white label DENTRO do .app — o app precisa ser autossuficiente
 # em qualquer Mac (bug corrigido em 2026-07-03, docs/10_PROJECT_STATUS.md).
-cp -R .build/release/FluxSoftphone_FluxWhiteLabel.bundle "$APP/Contents/Resources/"
+cp -R .build/arm64-apple-macosx/release/FluxSoftphone_FluxWhiteLabel.bundle "$APP/Contents/Resources/"
 
 echo "== Assinando (ad hoc, hardened runtime) =="
 codesign --force -s - --options runtime \
