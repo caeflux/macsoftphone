@@ -1,0 +1,31 @@
+{
+  "brandId": "flux",
+  "appName": "Flux Softphone",
+  "companyName": "Flux Tecnologia",
+  "supportEmail": "suporte@flux.net.br",
+  "supportUrl": "https://flux.net.br",
+  "privacyUrl": "https://flux.net.br/politica-de-privacidade",
+  "apiBaseUrl": "https://api.flux.net.br",
+  "provisioningBaseUrl": "https://provisioning.flux.net.br",
+  "defaultSipDomain": "sip.flux.net.br",
+  "theme": {
+    "primaryColor": "#111827",
+    "accentColor": "#2563EB",
+    "successColor": "#16A34A",
+    "warningColor": "#F59E0B",
+    "dangerColor": "#DC2626",
+    "backgroundColor": "#F8FAFC",
+    "surfaceColor": "#FFFFFF",
+    "textPrimaryColor": "#0F172A",
+    "textSecondaryColor": "#475569"
+  },
+  "features": {
+    "manualSipLogin": true,
+    "provisioningLogin": false,
+    "callHistory": true,
+    "contacts": false,
+    "crmIntegration": false,
+    "autoUpdate": false,
+    "diagnostics": true
+  }
+}

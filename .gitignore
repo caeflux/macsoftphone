@@ -1,0 +1,16 @@
+# Artefatos de build do SPM e do empacotador
+.build/
+build/
+
+# Xcode (quando usado)
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# macOS
+.DS_Store
+
+# Segredos locais nunca entram no repositório (docs/05)
+*.pem
+*.p12
+*.env
