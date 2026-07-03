@@ -41,12 +41,12 @@ public struct MediaPreferences: Equatable, Sendable {
         self.autoGainControlEnabled = autoGainControlEnabled
     }
 
-    /// Padrão: PCMA primeiro (padrão nos PABX do mercado) e processamento de
-    /// voz DESLIGADO — teste de campo (2026-07-03) teve chamada muda com o
-    /// VPIO ligado por padrão; até validar em campo, o caminho de áudio
-    /// padrão é o da V1 e o AEC/NS é opt-in nos Ajustes.
+    /// Padrão = comportamento validado em campo da V1: oferta PCMU primeiro
+    /// e processamento de voz DESLIGADO. Ambos são conscientemente idênticos
+    /// à V1 após os incidentes de chamada muda de 2026-07-03 — qualquer
+    /// desvio do caminho validado é opt-in nos Ajustes até provar-se em campo.
     public static let standard = MediaPreferences(
-        preferredCodec: .pcma,
+        preferredCodec: .pcmu,
         voiceProcessingEnabled: false,
         autoGainControlEnabled: true
     )

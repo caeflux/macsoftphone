@@ -21,9 +21,9 @@ struct MediaPreferencesStoreTests {
         defer { cleanup(suite) }
 
         #expect(store.load() == .standard)
-        #expect(store.load().preferredCodec == .pcma)
-        // VP desligado por padrão até validação em campo (chamada muda no
-        // teste de 2026-07-03 com o VPIO ligado).
+        // Padrão = V1 validada em campo: PCMU primeiro na oferta e VP
+        // desligado (incidentes de chamada muda em 2026-07-03).
+        #expect(store.load().preferredCodec == .pcmu)
         #expect(!store.load().voiceProcessingEnabled)
         #expect(store.load().autoGainControlEnabled)
     }

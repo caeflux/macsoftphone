@@ -19,6 +19,10 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
     /// Definido na criação (por chamada) — nunca muda com a mídia rodando.
     private let processing: AudioProcessingOptions
 
+    /// Narração para a tela de Diagnóstico (contadores de RTP) — evidência
+    /// de ONDE o áudio morre quando uma chamada fica muda em campo.
+    private let diagnostics: (@Sendable (String) -> Void)?
+
     private let socketFD: Int32
     private let lock = NSLock()
 
@@ -38,11 +42,17 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
     private var telephoneEventPT: Int?
     private var pendingDTMF: [(payload: [UInt8], marker: Bool)] = []
     private var dtmfStartTimestamp: UInt32 = 0
+    /// Contadores de mídia (protegidos por `lock`), para o Diagnóstico.
+    private var rtpSent = 0
+    private var rtpReceived = 0
+    private var rtpDroppedOtherPT = 0
+    private var lastReceivedPT: Int?
 
     private var engine: AVAudioEngine?
     private var sourceNode: AVAudioSourceNode?
     private var sendTimer: DispatchSourceTimer?
     private var receiveSource: DispatchSourceRead?
+    private var statsTimer: DispatchSourceTimer?
 
     private let mediaQueue = DispatchQueue(label: "rtp-media", qos: .userInteractive)
 
@@ -57,8 +67,12 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
         return body()
     }
 
-    public init(processing: AudioProcessingOptions = .disabled) throws {
+    public init(
+        processing: AudioProcessingOptions = .disabled,
+        diagnostics: (@Sendable (String) -> Void)? = nil
+    ) throws {
         self.processing = processing
+        self.diagnostics = diagnostics
         // Cópia local: os closures abaixo não podem capturar `self.socketFD`
         // antes de todos os membros estarem inicializados.
         let fd = socket(AF_INET, SOCK_DGRAM, 0)
@@ -128,6 +142,7 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
         try startAudioEngine()
         startReceiving()
         startSending()
+        startStatsReporting()
         AppLog.audio.info("Mídia RTP iniciada (porta local \(self.localRTPPort, privacy: .public))")
     }
 
@@ -215,6 +230,8 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
         sendTimer = nil
         receiveSource?.cancel()
         receiveSource = nil
+        statsTimer?.cancel()
+        statsTimer = nil
 
         if let engine {
             engine.inputNode.removeTap(onBus: 0)
@@ -386,6 +403,7 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
             packet.withUnsafeBytes { raw in
                 _ = send(socketFD, raw.baseAddress, raw.count, 0)
             }
+            locked { rtpSent += 1 }
             return
         }
 
@@ -415,6 +433,33 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
         packet.withUnsafeBytes { raw in
             _ = send(socketFD, raw.baseAddress, raw.count, 0)
         }
+        locked { rtpSent += 1 }
+    }
+
+    /// A cada 5 s narra os contadores no Diagnóstico: tx/rx dizem na hora se
+    /// uma chamada muda é falta de RTP do servidor (rx=0), payload inesperado
+    /// (descartados>0) ou problema local de captura/reprodução (contadores ok).
+    private func startStatsReporting() {
+        guard diagnostics != nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: mediaQueue)
+        timer.schedule(deadline: .now() + .seconds(5), repeating: .seconds(5))
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            let report: String? = self.locked {
+                guard self.running else { return nil }
+                var line = "RTP tx \(self.rtpSent), rx \(self.rtpReceived)"
+                if let pt = self.lastReceivedPT {
+                    line += " (último PT \(pt))"
+                }
+                if self.rtpDroppedOtherPT > 0 {
+                    line += ", descartados \(self.rtpDroppedOtherPT)"
+                }
+                return line
+            }
+            if let report { self.diagnostics?(report) }
+        }
+        timer.resume()
+        statsTimer = timer
     }
 
     private func startReceiving() {
@@ -436,8 +481,18 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
 
         lock.lock()
         defer { lock.unlock() }
-        guard running, Int(packet.payloadType) == codec.rawValue else { return }
-        let samples = G711.decode(packet.payload, codec: codec)
+        guard running else { return }
+        lastReceivedPT = Int(packet.payloadType)
+        // Tolerante ao payload REAL: alguns servidores transmitem o outro
+        // G.711 (ou trocam no meio); decodifica pelo PT do pacote, não pelo
+        // negociado — áudio vale mais que rigor de SDP.
+        guard let packetCodec = G711Codec(rawValue: Int(packet.payloadType)) else {
+            // telephone-event (DTMF de entrada) e afins: fora do playout.
+            rtpDroppedOtherPT += 1
+            return
+        }
+        rtpReceived += 1
+        let samples = G711.decode(packet.payload, codec: packetCodec)
         playoutBuffer.write(samples)
     }
 }

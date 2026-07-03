@@ -106,10 +106,6 @@ public actor NativeSIPClient: SIPClientProtocol {
         (events, continuation) = AsyncStream.makeStream(of: SIPEvent.self)
     }
 
-    /// Codec G.711 preferido pelo usuário, para ofertas e desempates.
-    private var preferredCodec: G711Codec {
-        G711Codec(preference: mediaPreferences().preferredCodec)
-    }
 
     private func log(_ message: String) {
         diagnostics?("SIP real — \(message)")
@@ -324,8 +320,11 @@ public actor NativeSIPClient: SIPClientProtocol {
                 endCall(reason: .localHangup)
                 return
             }
+            // Semântica V1: a resposta do remoto DEFINE o codec (primeiro da
+            // lista dele). Preferir o nosso aqui arrisca mandar/esperar codec
+            // diferente do que o servidor de mídia realmente usa.
             guard let remote = SDP.parseRemoteMedia(response.body),
-                  let codec = remote.negotiatedCodec(preferring: preferredCodec) else {
+                  let codec = remote.negotiatedCodec else {
                 log("← 200 OK mas SDP sem codec compatível — encerrando com BYE")
                 await sendBye(account: account)
                 failCall(reason: .serverError)
@@ -462,8 +461,10 @@ public actor NativeSIPClient: SIPClientProtocol {
               let invite = context.incomingInvite
         else { throw SIPClientError.callNotFound(id: callId) }
 
+        // Semântica V1: codec = primeiro da oferta do remoto (o que ele vai
+        // realmente transmitir). Preferência local fica só na NOSSA oferta.
         guard let remote = SDP.parseRemoteMedia(invite.body),
-              let codec = remote.negotiatedCodec(preferring: preferredCodec) else {
+              let codec = remote.negotiatedCodec else {
             try? await sendRaw(SIPRequestBuilder.response(
                 status: 488, reason: "Not Acceptable Here",
                 to: invite,
@@ -747,9 +748,9 @@ public actor NativeSIPClient: SIPClientProtocol {
     private func answerInDialogMediaOffer(_ request: SIPRequest, method: String) async {
         guard var context = call, let account else { return }
 
-        var codec = context.negotiatedCodec ?? preferredCodec
+        var codec = context.negotiatedCodec ?? .pcmu
         if !request.body.isEmpty, let remote = SDP.parseRemoteMedia(request.body) {
-            if let newCodec = remote.negotiatedCodec(preferring: preferredCodec) {
+            if let newCodec = remote.negotiatedCodec {
                 codec = newCodec
             }
             let destinationChanged = context.remoteMedia?.connectionAddress != remote.connectionAddress
