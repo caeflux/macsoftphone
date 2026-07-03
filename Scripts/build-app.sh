@@ -32,7 +32,7 @@ cd "$ROOT"
 APP_NAME="Flux Softphone"
 EXECUTABLE="FluxSoftphone"
 BUNDLE_ID="br.com.flux.softphone"
-VERSION="0.5.0"
+VERSION="1.0.0"
 BUILD_DIR="$ROOT/build"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 

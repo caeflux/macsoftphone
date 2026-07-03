@@ -187,6 +187,6 @@ struct SettingsView: View {
 enum AppInfo {
     static var versionLabel: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        return version ?? "0.1.0-dev"
+        return version ?? "1.0.0-dev"
     }
 }
