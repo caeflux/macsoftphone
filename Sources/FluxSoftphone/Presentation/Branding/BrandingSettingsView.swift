@@ -48,22 +48,6 @@ struct BrandingSettingsView: View {
             resetSection
         }
         .formStyle(.grouped)
-        .fileImporter(
-            isPresented: $isImportingLogo,
-            allowedContentTypes: [.image]
-        ) { result in
-            importImage(result) { data, ext in
-                try themeStore.setLogo(data, fileExtension: ext)
-            }
-        }
-        .fileImporter(
-            isPresented: $isImportingBackground,
-            allowedContentTypes: [.image]
-        ) { result in
-            importImage(result) { data, ext in
-                try themeStore.setBackgroundImage(data, fileExtension: ext)
-            }
-        }
         .confirmationDialog(
             "Restaurar o tema padrão?",
             isPresented: $isConfirmingReset,
@@ -89,6 +73,16 @@ struct BrandingSettingsView: View {
                 HStack(spacing: 10) {
                     BrandLogoView(fallbackName: appState.brand.appName, size: 28)
                     Button("Escolher…") { isImportingLogo = true }
+                        // Cada fileImporter no SEU botão: dois na mesma view
+                        // fazem o SwiftUI ignorar um deles silenciosamente.
+                        .fileImporter(
+                            isPresented: $isImportingLogo,
+                            allowedContentTypes: [.image]
+                        ) { result in
+                            importImage(result) { data, ext in
+                                try themeStore.setLogo(data, fileExtension: ext)
+                            }
+                        }
                     if themeStore.logoData != nil {
                         Button("Remover") { themeStore.removeLogo() }
                     }
@@ -164,6 +158,14 @@ struct BrandingSettingsView: View {
                         }
                         Button(themeStore.backgroundImageData == nil ? "Escolher…" : "Trocar…") {
                             isImportingBackground = true
+                        }
+                        .fileImporter(
+                            isPresented: $isImportingBackground,
+                            allowedContentTypes: [.image]
+                        ) { result in
+                            importImage(result) { data, ext in
+                                try themeStore.setBackgroundImage(data, fileExtension: ext)
+                            }
                         }
                         if themeStore.backgroundImageData != nil {
                             Button("Remover") { themeStore.removeBackgroundImage() }
