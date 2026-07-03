@@ -7,9 +7,12 @@ import FluxWhiteLabel
 /// (docs/04_UI_UX_GUIDELINES.md — tela de chamada ativa).
 struct ActiveCallBar: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var themeStore: ThemeStore
     let call: CallSession
 
-    private var theme: BrandTheme { appState.brand.theme }
+    private var theme: BrandTheme {
+        themeStore.theme.resolvedBrandTheme(base: appState.brand.theme)
+    }
 
     var body: some View {
         HStack(spacing: 12) {
