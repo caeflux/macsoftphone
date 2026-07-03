@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import FluxDomain
 @testable import FluxInfrastructure
 
 @Suite("G.711")
@@ -111,6 +112,36 @@ struct SDPTests {
         #expect(remote?.connectionAddress == "10.0.0.1")
         #expect(remote?.audioPort == 5004)
         #expect(remote?.negotiatedCodec == .pcma) // primeiro da lista remota
+    }
+
+    @Test("negotiatedCodec(preferring:) honra nossa preferência quando ofertada")
+    func negotiatedCodecHonorsLocalPreference() {
+        let sdp = "v=0\r\nc=IN IP4 10.0.0.1\r\nm=audio 5004 RTP/AVP 8 0\r\n"
+        let remote = SDP.parseRemoteMedia(sdp)
+        // Remoto prefere PCMA, mas oferece ambos: nossa preferência vence.
+        #expect(remote?.negotiatedCodec(preferring: .pcmu) == .pcmu)
+        #expect(remote?.negotiatedCodec(preferring: .pcma) == .pcma)
+    }
+
+    @Test("negotiatedCodec(preferring:) cai na ordem remota quando o nosso não é ofertado")
+    func negotiatedCodecFallsBackToRemoteOrder() {
+        let sdp = "v=0\r\nc=IN IP4 10.0.0.1\r\nm=audio 5004 RTP/AVP 0 101\r\n"
+        let remote = SDP.parseRemoteMedia(sdp)
+        #expect(remote?.negotiatedCodec(preferring: .pcma) == .pcmu)
+    }
+
+    @Test("offerOrder põe o codec preferido primeiro, sempre com os dois G.711")
+    func offerOrderFollowsPreference() {
+        #expect(G711Codec.offerOrder(preferring: .pcma) == [.pcma, .pcmu])
+        #expect(G711Codec.offerOrder(preferring: .pcmu) == [.pcmu, .pcma])
+
+        let sdp = SDP.audioDescription(
+            sessionId: "1",
+            host: "10.0.0.9",
+            rtpPort: 40000,
+            codecs: G711Codec.offerOrder(preferring: .pcma)
+        )
+        #expect(sdp.contains("m=audio 40000 RTP/AVP 8 0"))
     }
 
     @Test("c= de mídia sobrepõe c= de sessão")

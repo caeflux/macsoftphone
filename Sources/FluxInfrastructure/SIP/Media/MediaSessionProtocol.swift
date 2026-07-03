@@ -1,5 +1,26 @@
 import Foundation
 
+/// Processamento de voz aplicado à sessão de mídia (Voice Processing I/O da
+/// Apple). Cancelamento de eco e supressão de ruído são um recurso ÚNICO do
+/// sistema; AGC é uma flag separada dentro dele.
+public struct AudioProcessingOptions: Equatable, Sendable {
+    public var voiceProcessing: Bool
+    public var autoGainControl: Bool
+
+    public init(voiceProcessing: Bool, autoGainControl: Bool) {
+        self.voiceProcessing = voiceProcessing
+        self.autoGainControl = autoGainControl
+    }
+
+    /// Sem processamento — comportamento da engine validada em campo.
+    /// É o padrão do `RTPMediaSession.init`; a composição do app injeta a
+    /// preferência real do usuário.
+    public static let disabled = AudioProcessingOptions(
+        voiceProcessing: false,
+        autoGainControl: false
+    )
+}
+
 /// Sessão de mídia de uma chamada (RTP + áudio). Criada por chamada e
 /// descartada no encerramento. Abstraída para os testes do cliente SIP
 /// rodarem sem hardware de áudio.

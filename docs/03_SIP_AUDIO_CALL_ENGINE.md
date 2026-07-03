@@ -91,6 +91,39 @@ Preparar modelo para codecs, sem acoplar UI à implementação:
 - G.711 A-law/u-law para compatibilidade.
 - G.729 apenas se houver licença e decisão explícita.
 
+### Implementado (2026-07-03): controle de codec G.711
+
+- `AudioCodecPreference` (FluxDomain) + `MediaPreferences` persistidas em
+  UserDefaults (`UserDefaultsMediaPreferencesStore`), editáveis em
+  Ajustes → Áudio. Padrão: PCMA primeiro (mercado brasileiro).
+- Oferta SDP: `G711Codec.offerOrder(preferring:)` — o preferido primeiro,
+  ambos sempre ofertados (interoperabilidade).
+- Resposta/re-INVITE: `RemoteMedia.negotiatedCodec(preferring:)` — escolhe o
+  NOSSO preferido quando o remoto o oferece; senão, a ordem do remoto.
+- As preferências são lidas a cada negociação (closure injetada no
+  `NativeSIPClient`) — mudanças valem para a próxima chamada, nunca para a
+  chamada em andamento.
+- Codecs futuros (Opus/G.722) entram por `AudioCodecPreference` + encoder no
+  `RTPMediaSession` sem tocar na UI.
+
+## Processamento de voz (2026-07-03)
+
+Cancelamento de eco acústico (AEC) e supressão de ruído via **Voice
+Processing I/O** da Apple (`setVoiceProcessingEnabled` na entrada E na saída
+do `AVAudioEngine` — o AEC referencia o áudio reproduzido pelo próprio
+engine). AGC é flag separada (`isVoiceProcessingAGCEnabled`).
+
+- Configurável por `AudioProcessingOptions` na criação do `RTPMediaSession`
+  (por chamada, via `mediaFactory` na composição). Padrão do produto: LIGADO
+  (softphone em alto-falante é rotina B2B); padrão do `init` sem opções:
+  desligado (comportamento validado em campo — usado nos testes).
+- Habilitado ANTES de ler formatos/instalar taps — o VPIO troca a unidade de
+  I/O e os formatos mudam; o conversor de 8 kHz absorve qualquer taxa.
+- Falha ao habilitar NÃO derruba a chamada: log em `AppLog.audio` e a mídia
+  segue sem processamento (o plano B é o áudio validado, nunca o silêncio).
+- AEC+NS são um recurso único do sistema — a UI expõe um só toggle para os
+  dois, mais o toggle de AGC (honestidade sobre o que o sistema oferece).
+
 ## Estados de chamada
 
 ```swift

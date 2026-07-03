@@ -322,6 +322,27 @@ explicitamente (Contents/Resources → diretório do executável → contexto de
 testes), sem `Bundle.module`, falhando gracioso (fallback neutro). Verificado
 com o bundle de `.build` renomeado: o `.app` carrega a marca do próprio pacote.
 
+## Controle de codecs + cancelamento de eco/supressão de ruído — 2026-07-03
+
+Primeira etapa funcional da V2 (Ajustes → Áudio):
+
+- **Controle de codec G.711**: `MediaPreferences` (FluxDomain) com codec
+  preferido (PCMA padrão — mercado BR), persistido em UserDefaults. A oferta
+  SDP anuncia o preferido primeiro (ambos sempre ofertados); em resposta e
+  re-INVITE, `negotiatedCodec(preferring:)` escolhe o nosso quando o remoto o
+  oferece. Preferências lidas a cada negociação — valem na próxima chamada.
+- **Eco/ruído/ganho**: Voice Processing I/O da Apple no `RTPMediaSession`
+  (`AudioProcessingOptions` por chamada): AEC + supressão de ruído (recurso
+  único do sistema, um toggle) e AGC (toggle próprio). Habilitado antes de
+  ler formatos (o VPIO os troca); falha vira log + mídia sem processamento —
+  nunca silêncio. Padrão do produto: ligado.
+- UI: Ajustes → Áudio ganhou picker de codec e os dois toggles, com nota de
+  que alterações valem a partir da próxima chamada (chamada ativa intocada).
+- 130 testes (6 novos: round-trip do store, fallback de codec desconhecido,
+  preferência local honrada/fallback na negociação, ordem da oferta SDP).
+- Pendente de validação em campo: qualidade do AEC/NS contra PABX real em
+  alto-falante (teste unitário não cobre acústica).
+
 ## Próximo ciclo
 
 1. **Validar em campo**: chamada de entrada (celular → ramal do app) e DTMF contra URA real (ex.: ligar para o atendimento e navegar o menu).

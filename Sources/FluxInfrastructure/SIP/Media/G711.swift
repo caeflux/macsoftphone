@@ -1,4 +1,5 @@
 import Foundation
+import FluxDomain
 
 /// Codec negociado para a mídia da chamada. Payload types estáticos do RTP.
 public enum G711Codec: Int, Sendable, Equatable {
@@ -10,6 +11,23 @@ public enum G711Codec: Int, Sendable, Equatable {
         case .pcmu: return "PCMU"
         case .pcma: return "PCMA"
         }
+    }
+}
+
+public extension G711Codec {
+    /// Ponte da preferência de domínio para o codec RTP concreto.
+    init(preference: AudioCodecPreference) {
+        switch preference {
+        case .pcma: self = .pcma
+        case .pcmu: self = .pcmu
+        }
+    }
+
+    /// Ordem da oferta SDP: o preferido primeiro, o outro em seguida —
+    /// ambos sempre ofertados (interoperabilidade acima de preferência).
+    static func offerOrder(preferring preference: AudioCodecPreference) -> [G711Codec] {
+        let preferred = G711Codec(preference: preference)
+        return preferred == .pcma ? [.pcma, .pcmu] : [.pcmu, .pcma]
     }
 }
 

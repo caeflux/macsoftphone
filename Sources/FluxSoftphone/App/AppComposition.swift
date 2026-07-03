@@ -14,14 +14,20 @@ enum AppComposition {
         let credentialsStore = KeychainCredentialsStore(service: keychainService(for: brand))
         let callHistoryRepository = FileCallHistoryRepository(directory: dataDirectory(for: brand))
         let diagnosticLog = DiagnosticLog()
+        let mediaPreferencesStore = UserDefaultsMediaPreferencesStore()
         return AppState(
             brand: brand,
-            sipClient: makeSIPClient(brand: brand, diagnosticLog: diagnosticLog),
+            sipClient: makeSIPClient(
+                brand: brand,
+                diagnosticLog: diagnosticLog,
+                mediaPreferencesStore: mediaPreferencesStore
+            ),
             diagnosticLog: diagnosticLog,
             credentialsStore: credentialsStore,
             callHistoryRepository: callHistoryRepository,
             audioDeviceService: CoreAudioDeviceService(),
-            microphonePermissionService: AVFMicrophonePermissionService()
+            microphonePermissionService: AVFMicrophonePermissionService(),
+            mediaPreferencesStore: mediaPreferencesStore
         )
     }
 
@@ -55,12 +61,23 @@ enum AppComposition {
     /// funcionalidade quebrada, não recurso de desenvolvimento.
     private static func makeSIPClient(
         brand: BrandConfig,
-        diagnosticLog: DiagnosticLog
+        diagnosticLog: DiagnosticLog,
+        mediaPreferencesStore: UserDefaultsMediaPreferencesStore
     ) -> any SIPClientProtocol {
         // User-Agent vem da marca — nada hardcoded.
         let product = brand.appName.replacingOccurrences(of: " ", with: "")
         return NativeSIPClient(
             userAgent: "\(product)/\(AppInfo.versionLabel)",
+            // Lidos a cada chamada: mudar Ajustes → Áudio vale para a
+            // PRÓXIMA chamada, sem reconfigurar a engine.
+            mediaFactory: {
+                let preferences = mediaPreferencesStore.load()
+                return try RTPMediaSession(processing: AudioProcessingOptions(
+                    voiceProcessing: preferences.voiceProcessingEnabled,
+                    autoGainControl: preferences.autoGainControlEnabled
+                ))
+            },
+            mediaPreferences: { mediaPreferencesStore.load() },
             diagnostics: { diagnosticLog.append($0) }
         )
     }

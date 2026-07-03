@@ -52,7 +52,47 @@ struct SettingsView: View {
             Text("A preferência de dispositivo é aplicada às chamadas quando a engine SIP real estiver ativa.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            mediaPreferencesRows
         }
+    }
+
+    /// Codec e processamento de voz (Voice Processing I/O do macOS).
+    @ViewBuilder
+    private var mediaPreferencesRows: some View {
+        Picker(
+            "Codec preferido",
+            selection: mediaBinding(\.preferredCodec)
+        ) {
+            ForEach(AudioCodecPreference.allCases) { codec in
+                Text(codec.displayName).tag(codec)
+            }
+        }
+
+        Toggle(
+            "Cancelamento de eco e supressão de ruído",
+            isOn: mediaBinding(\.voiceProcessingEnabled)
+        )
+
+        Toggle(
+            "Ganho automático do microfone",
+            isOn: mediaBinding(\.autoGainControlEnabled)
+        )
+        // AGC faz parte do processamento de voz — sem ele, não há o que ligar.
+        .disabled(!appState.mediaPreferences.voiceProcessingEnabled)
+
+        Text("O codec preferido é anunciado primeiro ao PABX (a central decide). Eco, ruído e ganho usam o processamento de voz do macOS. Alterações valem a partir da próxima chamada.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private func mediaBinding<Value>(
+        _ keyPath: WritableKeyPath<MediaPreferences, Value>
+    ) -> Binding<Value> {
+        Binding(
+            get: { appState.mediaPreferences[keyPath: keyPath] },
+            set: { value in appState.updateMediaPreferences { $0[keyPath: keyPath] = value } }
+        )
     }
 
     @ViewBuilder

@@ -82,12 +82,18 @@ public actor NativeSIPClient: SIPClientProtocol {
     /// números mascarados). Evidencia o tráfego real com o servidor.
     private let diagnostics: (@Sendable (String) -> Void)?
 
+    /// Preferências de mídia lidas NO MOMENTO de cada negociação (oferta,
+    /// resposta, re-INVITE) — mudança nos Ajustes vale para a próxima
+    /// chamada sem reconfigurar a engine.
+    private let mediaPreferences: @Sendable () -> MediaPreferences
+
     public init(
         userAgent: String,
         registrationExpiry: Int = 300,
         requestTimeout: Duration = .seconds(6),
         answerTimeout: Duration = .seconds(120),
         mediaFactory: @escaping MediaFactory = { try RTPMediaSession() },
+        mediaPreferences: @escaping @Sendable () -> MediaPreferences = { .standard },
         diagnostics: (@Sendable (String) -> Void)? = nil
     ) {
         self.userAgent = userAgent
@@ -95,8 +101,14 @@ public actor NativeSIPClient: SIPClientProtocol {
         self.requestTimeout = requestTimeout
         self.answerTimeout = answerTimeout
         self.mediaFactory = mediaFactory
+        self.mediaPreferences = mediaPreferences
         self.diagnostics = diagnostics
         (events, continuation) = AsyncStream.makeStream(of: SIPEvent.self)
+    }
+
+    /// Codec G.711 preferido pelo usuário, para ofertas e desempates.
+    private var preferredCodec: G711Codec {
+        G711Codec(preference: mediaPreferences().preferredCodec)
     }
 
     private func log(_ message: String) {
@@ -206,7 +218,9 @@ public actor NativeSIPClient: SIPClientProtocol {
             sessionId: sdpSessionId(),
             host: localEndpoint.host,
             rtpPort: context.media?.localRTPPort ?? 0,
-            codecs: [.pcmu, .pcma],
+            // Ordem da oferta = preferência do usuário (Ajustes → Áudio);
+            // ambos os G.711 sempre ofertados, por interoperabilidade.
+            codecs: G711Codec.offerOrder(preferring: mediaPreferences().preferredCodec),
             telephoneEventPayloadType: Self.offeredTelephoneEventPT
         )
         do {
@@ -311,7 +325,7 @@ public actor NativeSIPClient: SIPClientProtocol {
                 return
             }
             guard let remote = SDP.parseRemoteMedia(response.body),
-                  let codec = remote.negotiatedCodec else {
+                  let codec = remote.negotiatedCodec(preferring: preferredCodec) else {
                 log("← 200 OK mas SDP sem codec compatível — encerrando com BYE")
                 await sendBye(account: account)
                 failCall(reason: .serverError)
@@ -449,7 +463,7 @@ public actor NativeSIPClient: SIPClientProtocol {
         else { throw SIPClientError.callNotFound(id: callId) }
 
         guard let remote = SDP.parseRemoteMedia(invite.body),
-              let codec = remote.negotiatedCodec else {
+              let codec = remote.negotiatedCodec(preferring: preferredCodec) else {
             try? await sendRaw(SIPRequestBuilder.response(
                 status: 488, reason: "Not Acceptable Here",
                 to: invite,
@@ -733,9 +747,9 @@ public actor NativeSIPClient: SIPClientProtocol {
     private func answerInDialogMediaOffer(_ request: SIPRequest, method: String) async {
         guard var context = call, let account else { return }
 
-        var codec = context.negotiatedCodec ?? .pcmu
+        var codec = context.negotiatedCodec ?? preferredCodec
         if !request.body.isEmpty, let remote = SDP.parseRemoteMedia(request.body) {
-            if let newCodec = remote.negotiatedCodec {
+            if let newCodec = remote.negotiatedCodec(preferring: preferredCodec) {
                 codec = newCodec
             }
             let destinationChanged = context.remoteMedia?.connectionAddress != remote.connectionAddress

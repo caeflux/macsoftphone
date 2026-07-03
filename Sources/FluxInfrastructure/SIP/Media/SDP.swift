@@ -17,6 +17,14 @@ enum SDP {
             }
             return nil
         }
+
+        /// Codec comum honrando a NOSSA preferência quando o remoto também a
+        /// oferece; senão, cai na ordem do remoto (RFC 3264 permite ambos —
+        /// escolher o nosso evita transcodificação do lado que controlamos).
+        func negotiatedCodec(preferring preferred: G711Codec) -> G711Codec? {
+            if payloadTypes.contains(preferred.rawValue) { return preferred }
+            return negotiatedCodec
+        }
     }
 
     /// Oferta/resposta de áudio com PCMU+PCMA (oferta) ou codec único

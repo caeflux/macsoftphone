@@ -11,9 +11,13 @@ import Darwin
 /// reprodução → AVAudioSourceNode (silêncio em underrun).
 ///
 /// Estado interno protegido por lock — callbacks de áudio e rede chegam em
-/// threads próprias. Sem cancelamento de eco por enquanto (usar fone).
+/// threads próprias. Cancelamento de eco/supressão de ruído via Voice
+/// Processing I/O quando habilitados em `AudioProcessingOptions`.
 public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
     public let localRTPPort: Int
+
+    /// Definido na criação (por chamada) — nunca muda com a mídia rodando.
+    private let processing: AudioProcessingOptions
 
     private let socketFD: Int32
     private let lock = NSLock()
@@ -53,7 +57,8 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
         return body()
     }
 
-    public init() throws {
+    public init(processing: AudioProcessingOptions = .disabled) throws {
+        self.processing = processing
         // Cópia local: os closures abaixo não podem capturar `self.socketFD`
         // antes de todos os membros estarem inicializados.
         let fd = socket(AF_INET, SOCK_DGRAM, 0)
@@ -224,6 +229,28 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
     private func startAudioEngine() throws {
         let engine = AVAudioEngine()
         let input = engine.inputNode
+
+        // Voice Processing I/O (cancelamento de eco + supressão de ruído):
+        // precisa ser habilitado ANTES de ler formatos/instalar taps — o
+        // sistema troca a unidade de I/O e os formatos mudam. Entrada e saída
+        // habilitadas em par (o AEC referencia o áudio reproduzido). Falha
+        // aqui NÃO derruba a chamada: segue sem processamento, com log — o
+        // áudio validado em campo é o plano B, nunca o silêncio.
+        if processing.voiceProcessing {
+            do {
+                try input.setVoiceProcessingEnabled(true)
+                try engine.outputNode.setVoiceProcessingEnabled(true)
+                input.isVoiceProcessingAGCEnabled = processing.autoGainControl
+                AppLog.audio.info(
+                    "Voice processing ativo (AEC+NS; AGC \(self.processing.autoGainControl ? "on" : "off", privacy: .public))"
+                )
+            } catch {
+                AppLog.audio.error(
+                    "Voice processing indisponível; seguindo sem AEC/NS: \(String(describing: error), privacy: .public)"
+                )
+            }
+        }
+
         let inputFormat = input.outputFormat(forBus: 0)
 
         guard inputFormat.sampleRate > 0,

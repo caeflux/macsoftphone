@@ -22,6 +22,9 @@ final class AppState: ObservableObject {
     @Published private(set) var preferredInputDeviceId: String?
     @Published private(set) var preferredOutputDeviceId: String?
     @Published private(set) var microphonePermission: MicrophonePermissionStatus = .undetermined
+    /// Preferências de mídia (codec, eco/ruído, AGC) — Ajustes → Áudio.
+    /// Alterações valem a partir da próxima chamada.
+    @Published private(set) var mediaPreferences: MediaPreferences
     /// Mensagem amigável de erro/aviso para exibição direta na UI.
     @Published private(set) var userMessage: String? {
         didSet {
@@ -54,6 +57,7 @@ final class AppState: ObservableObject {
     private let callHistoryRepository: any CallHistoryRepositoryProtocol
     private let audioDeviceService: any AudioDeviceServiceProtocol
     private let microphonePermissionService: any MicrophonePermissionServiceProtocol
+    private let mediaPreferencesStore: any MediaPreferencesStoreProtocol
     private var eventTask: Task<Void, Never>?
     /// Operação de registro/desregistro em voo. Cada nova operação cancela
     /// a anterior — sem isso, um register disparado antes de removeAccount
@@ -70,7 +74,8 @@ final class AppState: ObservableObject {
         credentialsStore: any SecureCredentialsStoreProtocol,
         callHistoryRepository: any CallHistoryRepositoryProtocol,
         audioDeviceService: any AudioDeviceServiceProtocol,
-        microphonePermissionService: any MicrophonePermissionServiceProtocol
+        microphonePermissionService: any MicrophonePermissionServiceProtocol,
+        mediaPreferencesStore: any MediaPreferencesStoreProtocol
     ) {
         self.brand = brand
         self.sipClient = sipClient
@@ -79,6 +84,8 @@ final class AppState: ObservableObject {
         self.callHistoryRepository = callHistoryRepository
         self.audioDeviceService = audioDeviceService
         self.microphonePermissionService = microphonePermissionService
+        self.mediaPreferencesStore = mediaPreferencesStore
+        self.mediaPreferences = mediaPreferencesStore.load()
     }
 
     deinit {
@@ -170,6 +177,21 @@ final class AppState: ObservableObject {
         Task { [microphonePermissionService] in
             self.microphonePermission = await microphonePermissionService.requestAccess()
         }
+    }
+
+    /// Atualiza e persiste as preferências de mídia. Chamada em andamento
+    /// NÃO é tocada — a engine lê as preferências ao montar cada chamada.
+    func updateMediaPreferences(_ change: (inout MediaPreferences) -> Void) {
+        var updated = mediaPreferences
+        change(&updated)
+        guard updated != mediaPreferences else { return }
+        mediaPreferences = updated
+        mediaPreferencesStore.save(updated)
+        diagnosticLog.append(
+            "Mídia: codec preferido \(updated.preferredCodec.rawValue.uppercased()), "
+                + "eco/ruído \(updated.voiceProcessingEnabled ? "ligado" : "desligado"), "
+                + "AGC \(updated.autoGainControlEnabled ? "ligado" : "desligado") — vale para a próxima chamada"
+        )
     }
 
     // MARK: - Conta (Ciclo 3)
