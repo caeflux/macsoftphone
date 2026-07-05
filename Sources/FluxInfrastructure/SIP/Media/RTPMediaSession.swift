@@ -339,16 +339,23 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
         let engine = AVAudioEngine()
         let input = engine.inputNode
 
-        // Habilitado ANTES de ler formatos/instalar taps — o VPIO troca a
-        // unidade de I/O e os formatos mudam. Qualquer throw sobe para o
-        // chamador tentar a próxima camada (par → entrada → sem VP).
+        // Ordem descoberta empiricamente no macOS 15 (reprodução local,
+        // 2026-07-05): o grafo de saída precisa EXISTIR antes do
+        // setVoiceProcessingEnabled — em engine "virgem", o VPIO falha no
+        // engine.start() com kAudioUnitErr_FailedInitialization (-10875) na
+        // unidade de saída assim que qualquer nó de reprodução é conectado.
+        // Tocar o mainMixerNode materializa o grafo e o start passa.
+        // O VP continua vindo ANTES da leitura de formatos/tap — a entrada
+        // muda para multicanal (5 ch no MacBook Air) quando ele liga.
         switch mode {
         case .off:
             break
         case .inputOnly:
+            _ = engine.mainMixerNode.outputFormat(forBus: 0)
             try input.setVoiceProcessingEnabled(true)
             input.isVoiceProcessingAGCEnabled = processing.autoGainControl
         case .inputAndOutput:
+            _ = engine.mainMixerNode.outputFormat(forBus: 0)
             try input.setVoiceProcessingEnabled(true)
             try engine.outputNode.setVoiceProcessingEnabled(true)
             input.isVoiceProcessingAGCEnabled = processing.autoGainControl
