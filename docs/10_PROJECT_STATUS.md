@@ -364,6 +364,37 @@ Correções:
 Nota: o ringback da V1 vem em banda (após o 200); a engine não reproduz
 early media (183 com SDP) — suporte a early media fica como evolução futura.
 
+## ✅ CANCELAMENTO DE ECO VALIDADO EM CAMPO — 2026-07-05
+
+Depuração de dois dias fechada com confirmação do usuário: com o eco ligado,
+a voz que retornava pelo alto-falante→microfone do MacBook desapareceu para
+o interlocutor; áudio bidirecional intacto. VAD e controle de codec (PCMU e
+PCMA) também validados em campo. AGC segue em observação (clipping pontual).
+
+Três descobertas de macOS 15 pagaram a etapa (todas provadas por reprodução
+local com scripts, sem queimar chamadas de teste):
+
+1. **VPIO exige grafo de saída pré-existente**: `setVoiceProcessingEnabled`
+   em engine "virgem" → `engine.start()` falha com -10875 na unidade de
+   saída assim que um nó de reprodução é conectado. Tocar o `mainMixerNode`
+   ANTES do VP resolve. (Não documentado pela Apple.)
+2. **Entrada multicanal com VP**: o inputNode vira 5 canais no MacBook Air —
+   todos cópias idênticas do sinal JÁ processado pelo AEC.
+3. **Downmix implícito do AVAudioConverter multicanal→mono produz silêncio
+   absoluto sem reportar erro** — o canal 0 precisa ser extraído manualmente.
+
+Também na etapa: TCC de microfone invalidado a cada re-assinatura ad-hoc
+(entrega zeros com status "Permitida"; resolve com Developer ID no Ciclo 12);
+oferta PCMA-first inicialmente suspeita foi inocentada (era o microfone).
+
+Instrumentação permanente no Diagnóstico que viabilizou tudo: contadores RTP
+(tx/rx/PT/descartados), pico do microfone, tempo de subida do engine e
+estado REAL do AEC (ativo/indisponível/desligado).
+
+Pendências da frente de áudio: G.729 (decisão de negócio — licença comercial
+bcg729 vs transcodificação no PABX vs Opus), AGC/clipping em observação,
+preferência de dispositivo dos Ajustes ainda não aplicada ao engine.
+
 ## Próximo ciclo
 
 1. **Validar em campo**: chamada de entrada (celular → ramal do app) e DTMF contra URA real (ex.: ligar para o atendimento e navegar o menu).

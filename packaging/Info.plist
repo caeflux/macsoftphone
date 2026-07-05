@@ -2,25 +2,25 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>Flux Softphone</string>
-    <key>CFBundleDisplayName</key>
-    <string>Flux Softphone</string>
-    <key>CFBundleExecutable</key>
-    <string>FluxSoftphone</string>
-    <key>CFBundleIdentifier</key>
-    <string>br.com.flux.softphone</string>
-    <key>CFBundleVersion</key>
-    <string>2.0.0</string>
-    <key>CFBundleShortVersionString</key>
-    <string>2.0.0</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>O microfone é usado para transmitir sua voz durante as chamadas telefônicas.</string>
+	<key>CFBundleDisplayName</key>
+	<string>Flux Softphone</string>
+	<key>CFBundleExecutable</key>
+	<string>FluxSoftphone</string>
+	<key>CFBundleIdentifier</key>
+	<string>br.com.flux.softphone</string>
+	<key>CFBundleName</key>
+	<string>Flux Softphone</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>2.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>2.1.0</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>O microfone é usado para transmitir sua voz durante as chamadas telefônicas.</string>
 </dict>
 </plist>

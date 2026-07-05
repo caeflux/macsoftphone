@@ -87,7 +87,7 @@ struct SettingsView: View {
         // sem ele, não há o que ligar.
         .disabled(!appState.mediaPreferences.echoCancellationEnabled)
 
-        Text("O codec preferido é anunciado primeiro ao PABX (a central decide); em caso de mudez, volte para PCMU. Eco, ruído, silêncio e ganho limpam o áudio que VOCÊ ENVIA — quem se beneficia é quem te ouve. O cancelamento de eco impede que o outro lado ouça a própria voz de volta quando você usa alto-falante (processamento de voz do macOS, com redução de ruído embutida; em validação). A supressão de silêncio corta o som de fundo quando você não está falando. Alterações valem a partir da próxima chamada.")
+        Text("O codec preferido é anunciado primeiro ao PABX (a central decide). Eco, ruído, silêncio e ganho limpam o áudio que VOCÊ ENVIA — quem se beneficia é quem te ouve. O cancelamento de eco impede que o outro lado ouça a própria voz de volta quando você usa alto-falante (processamento de voz do macOS, com redução de ruído embutida). A supressão de silêncio corta o som de fundo quando você não está falando. Alterações valem a partir da próxima chamada.")
             .font(.caption)
             .foregroundStyle(.secondary)
     }
