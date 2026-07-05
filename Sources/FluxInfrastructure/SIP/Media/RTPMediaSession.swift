@@ -363,6 +363,10 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
 
         let inputFormat = input.outputFormat(forBus: 0)
 
+        // Com VP a entrada vira multicanal (5 ch idênticos e processados no
+        // MacBook Air). O downmix implícito do AVAudioConverter multicanal →
+        // mono produz SILÊNCIO sem erro (medido em 2026-07-05) — o canal 0 é
+        // extraído manualmente e o conversor trabalha sempre mono → 8 kHz.
         guard inputFormat.sampleRate > 0,
               let codecFormat = AVAudioFormat(
                   commonFormat: .pcmFormatInt16,
@@ -370,15 +374,28 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
                   channels: 1,
                   interleaved: true
               ),
-              let converter = AVAudioConverter(from: inputFormat, to: codecFormat),
+              let monoInputFormat = AVAudioFormat(
+                  standardFormatWithSampleRate: inputFormat.sampleRate,
+                  channels: 1
+              ),
+              let converter = AVAudioConverter(
+                  from: inputFormat.channelCount == 1 ? inputFormat : monoInputFormat,
+                  to: codecFormat
+              ),
               let playbackFormat = AVAudioFormat(standardFormatWithSampleRate: 8000, channels: 1)
         else {
             throw MediaSessionError.audioEngineFailure("formato de áudio indisponível")
         }
 
-        // Captura: microfone → 8 kHz Int16 → ring buffer de envio.
+        // Captura: microfone → (canal 0 se multicanal) → 8 kHz Int16 → ring
+        // buffer de envio.
         input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
-            self?.captureAndConvert(buffer: buffer, converter: converter, format: codecFormat)
+            self?.captureAndConvert(
+                buffer: buffer,
+                converter: converter,
+                format: codecFormat,
+                monoFormat: monoInputFormat
+            )
         }
 
         // Reprodução: buffer de recepção → alto-falante (mixer faz o SRC).
@@ -411,10 +428,26 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
     private func captureAndConvert(
         buffer: AVAudioPCMBuffer,
         converter: AVAudioConverter,
-        format: AVAudioFormat
+        format: AVAudioFormat,
+        monoFormat: AVAudioFormat
     ) {
-        let ratio = 8000.0 / buffer.format.sampleRate
-        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 16
+        // Multicanal (VPIO): extrai o canal 0 — os canais são cópias do
+        // mesmo sinal processado; o downmix implícito do conversor zera tudo.
+        let source: AVAudioPCMBuffer
+        if buffer.format.channelCount == 1 {
+            source = buffer
+        } else {
+            guard let mono = AVAudioPCMBuffer(pcmFormat: monoFormat, frameCapacity: buffer.frameLength),
+                  let src = buffer.floatChannelData?[0],
+                  let dst = mono.floatChannelData?[0]
+            else { return }
+            dst.update(from: src, count: Int(buffer.frameLength))
+            mono.frameLength = buffer.frameLength
+            source = mono
+        }
+
+        let ratio = 8000.0 / source.format.sampleRate
+        let capacity = AVAudioFrameCount(Double(source.frameLength) * ratio) + 16
         guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return }
 
         var consumed = false
@@ -426,7 +459,7 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
             }
             consumed = true
             status.pointee = .haveData
-            return buffer
+            return source
         }
         guard conversionError == nil,
               output.frameLength > 0,
