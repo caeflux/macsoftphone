@@ -125,8 +125,29 @@ engine). AGC é flag separada (`isVoiceProcessingAGCEnabled`).
   reconstruído. Entrada VPIO + saída normal = mudez — nunca deixar híbrido.
 - O start do engine loga modo + formato de entrada em `AppLog.audio` —
   evidência para depurar áudio em campo.
-- AEC+NS são um recurso único do sistema — a UI expõe um só toggle para os
-  dois, mais o toggle de AGC (honestidade sobre o que o sistema oferece).
+- AEC+NS são um recurso único do sistema; a UI expõe "Cancelamento de eco"
+  (com nota da redução de ruído embutida), "Supressão de silêncio (VAD)"
+  (gate de energia próprio no envio: sem fala por 300 ms, payload vira
+  silêncio; a cadência de pacotes continua — NAT/latching intactos) e AGC.
+
+### Direção do benefício (revisão 2026-07-05)
+
+Todas as features de processamento limpam o áudio ENVIADO — o beneficiado é
+o destino:
+
+- Cancelamento de eco: subtrai do microfone o áudio que estamos reproduzindo
+  → o DESTINO não ouve a própria voz de volta quando usamos alto-falante.
+  Eco ouvido POR NÓS nasce no lado remoto/PABX e não é tratável aqui.
+- Supressão de ruído/VAD/AGC: limpam o nosso envio.
+
+Requisito de AEC real atendido: a reprodução passa pelo MESMO engine que o
+VPIO controla (fonte → mixer → saída) — o cancelador tem o sinal de
+referência e o alinhamento de relógio do sistema.
+
+Pendências conhecidas: validação de campo do AEC pós-fix de latching;
+possível clipping com AGC (pico 32767 observado); preferência de
+dispositivo dos Ajustes ainda NÃO é aplicada ao engine (usa padrão do
+sistema — lacuna herdada da V1, tratar em patch próprio).
 
 ## Estados de chamada
 
