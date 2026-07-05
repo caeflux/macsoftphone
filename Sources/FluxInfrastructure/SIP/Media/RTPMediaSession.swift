@@ -66,6 +66,9 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
     private var sendTimer: DispatchSourceTimer?
     private var receiveSource: DispatchSourceRead?
     private var statsTimer: DispatchSourceTimer?
+    /// O VPIO realmente engatou? (Solicitado ≠ ativo: o fallback silencioso
+    /// reconstrói sem processamento — o Diagnóstico precisa dizer a verdade.)
+    private var voiceProcessingActive = false
 
     private let mediaQueue = DispatchQueue(label: "rtp-media", qos: .userInteractive)
 
@@ -171,9 +174,18 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
             throw error
         }
         let engineMillis = (DispatchTime.now().uptimeNanoseconds - engineStartedAt.uptimeNanoseconds) / 1_000_000
-        diagnostics?(
-            "engine de áudio pronto em \(engineMillis) ms (eco \(processing.voiceProcessing ? "ligado" : "desligado"))"
-        )
+        // Estado REAL do cancelador, não o solicitado — fallback silencioso
+        // precisa aparecer aqui para o teste de campo não comparar dois
+        // engines idênticos achando que compara com/sem AEC.
+        let echoStatus: String
+        if voiceProcessingActive {
+            echoStatus = "eco ATIVO (AGC \(processing.autoGainControl ? "on" : "off"))"
+        } else if processing.voiceProcessing {
+            echoStatus = "eco SOLICITADO MAS INDISPONÍVEL — chamada sem AEC"
+        } else {
+            echoStatus = "eco desligado"
+        }
+        diagnostics?("engine de áudio pronto em \(engineMillis) ms; \(echoStatus)")
         AppLog.audio.info("Mídia RTP iniciada (porta local \(self.localRTPPort, privacy: .public))")
     }
 
@@ -282,6 +294,7 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
         if processing.voiceProcessing {
             do {
                 try startEngine(voiceProcessing: true)
+                voiceProcessingActive = true
                 return
             } catch {
                 AppLog.audio.error(
@@ -290,6 +303,7 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
             }
         }
         try startEngine(voiceProcessing: false)
+        voiceProcessingActive = false
     }
 
     private func startEngine(voiceProcessing: Bool) throws {
