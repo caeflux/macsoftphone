@@ -292,29 +292,63 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
         // processamento — o caminho validado em campo. Nunca seguir com um
         // engine meio-configurado (entrada VPIO + saída normal = mudez).
         if processing.voiceProcessing {
+            // Camada 1: VP na entrada E na saída (par explícito).
             do {
-                try startEngine(voiceProcessing: true)
+                try startEngine(voiceProcessing: .inputAndOutput)
                 voiceProcessingActive = true
                 return
             } catch {
+                diagnostics?("eco: modo par falhou (\(Self.shortError(error))) — tentando só entrada")
                 AppLog.audio.error(
-                    "Voice processing falhou; reconstruindo engine sem processamento: \(String(describing: error), privacy: .public)"
+                    "VP par entrada+saída falhou: \(String(describing: error), privacy: .public)"
+                )
+            }
+            // Camada 2: VP só na entrada — no macOS a chamada na SAÍDA
+            // frequentemente lança erro; a da entrada já configura o par de
+            // I/O do engine (receita canônica do AVAudioEngine).
+            do {
+                try startEngine(voiceProcessing: .inputOnly)
+                voiceProcessingActive = true
+                return
+            } catch {
+                diagnostics?("eco: modo entrada falhou (\(Self.shortError(error))) — chamada sem AEC")
+                AppLog.audio.error(
+                    "VP só entrada falhou: \(String(describing: error), privacy: .public)"
                 )
             }
         }
-        try startEngine(voiceProcessing: false)
+        try startEngine(voiceProcessing: .off)
         voiceProcessingActive = false
     }
 
-    private func startEngine(voiceProcessing: Bool) throws {
+    /// Como ativar o Voice Processing I/O na tentativa desta engine.
+    private enum VoiceProcessingMode {
+        case off
+        case inputOnly
+        case inputAndOutput
+    }
+
+    /// Erro resumido para o Diagnóstico (domínio + código dizem tudo em
+    /// CoreAudio; a descrição completa vai para o log do sistema).
+    private static func shortError(_ error: Error) -> String {
+        let nsError = error as NSError
+        return "\(nsError.domain) \(nsError.code)"
+    }
+
+    private func startEngine(voiceProcessing mode: VoiceProcessingMode) throws {
         let engine = AVAudioEngine()
         let input = engine.inputNode
 
         // Habilitado ANTES de ler formatos/instalar taps — o VPIO troca a
-        // unidade de I/O e os formatos mudam. Entrada e saída em par (o AEC
-        // referencia o áudio reproduzido pelo próprio engine). Qualquer
-        // throw sobe para o chamador reconstruir do zero.
-        if voiceProcessing {
+        // unidade de I/O e os formatos mudam. Qualquer throw sobe para o
+        // chamador tentar a próxima camada (par → entrada → sem VP).
+        switch mode {
+        case .off:
+            break
+        case .inputOnly:
+            try input.setVoiceProcessingEnabled(true)
+            input.isVoiceProcessingAGCEnabled = processing.autoGainControl
+        case .inputAndOutput:
             try input.setVoiceProcessingEnabled(true)
             try engine.outputNode.setVoiceProcessingEnabled(true)
             input.isVoiceProcessingAGCEnabled = processing.autoGainControl
@@ -357,8 +391,13 @@ public final class RTPMediaSession: MediaSessionProtocol, @unchecked Sendable {
         self.sourceNode = source
         // Evidência para depuração em campo: modo + formato real da entrada
         // (o VPIO costuma trocar taxa/canais).
+        let modeLabel = switch mode {
+        case .off: "desligado"
+        case .inputOnly: "entrada"
+        case .inputAndOutput: "par"
+        }
         AppLog.audio.info(
-            "Engine de áudio ativo — VP \(voiceProcessing ? "ligado" : "desligado", privacy: .public), entrada \(Int(inputFormat.sampleRate), privacy: .public) Hz/\(inputFormat.channelCount, privacy: .public)ch"
+            "Engine de áudio ativo — VP \(modeLabel, privacy: .public), entrada \(Int(inputFormat.sampleRate), privacy: .public) Hz/\(inputFormat.channelCount, privacy: .public)ch"
         )
     }
 
