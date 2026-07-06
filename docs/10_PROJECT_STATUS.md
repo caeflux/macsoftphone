@@ -416,7 +416,7 @@ Também: logo do aparelho 20% maior (discador 46 pt, preview 41, visão 62).
 
 ## Próximo ciclo
 
-1. **Validar em campo**: chamada de entrada (celular → ramal do app) e DTMF contra URA real (ex.: ligar para o atendimento e navegar o menu).
+1. **Validar em campo**: chamada de entrada (celular → ramal do app). DTMF contra URA real ✅ validado em 2026-07-05 (navegação de menu com o teclado contextual).
 2. **Hold/resume** — completa a telefonia básica.
 3. **Robustez de rede**: Timer A (retransmissão UDP), jitter buffer adaptativo, reconexão pós-sleep.
 4. **Ciclo 12 — Release**: ícone, Developer ID + notarização, DMG.
