@@ -314,16 +314,49 @@ struct DialerView: View {
         return call.state.isLive && call.state != .incoming
     }
 
-    /// Backspace e Ligar/Encerrar dividem a MESMA largura do teclado
+    /// Backspace/mute e Ligar/Encerrar dividem a MESMA largura do teclado
     /// completo, em partes iguais — o botão de ação dobra como "Encerrar"
     /// (vermelho) sempre que há uma chamada em andamento, no lugar de ficar
-    /// cinza e inerte como antes.
+    /// cinza e inerte como antes. Em modo DTMF (chamada ativa) o backspace
+    /// não serve pra nada — o mesmo espaço vira o toggle de mute, já que no
+    /// modo compacto não há mais barra de chamada separada para isso.
     private var controls: some View {
         HStack(spacing: Self.keySpacing) {
-            backspaceButton
+            leadingControlButton
             callActionButton
         }
         .frame(width: Self.keypadWidth)
+    }
+
+    @ViewBuilder
+    private var leadingControlButton: some View {
+        if isDTMFMode {
+            muteButton
+        } else {
+            backspaceButton
+        }
+    }
+
+    private var muteButton: some View {
+        Button {
+            appState.toggleMute()
+        } label: {
+            Image(systemName: appState.isMuted ? "mic.slash.fill" : "mic.fill")
+                .font(.title3)
+                .foregroundStyle(appState.isMuted ? theme.danger : theme.textPrimary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+                .background(
+                    wlTheme.text.opacity(0.07),
+                    in: RoundedRectangle(cornerRadius: keyCornerRadius, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: keyCornerRadius, style: .continuous)
+                        .strokeBorder(wlTheme.text.opacity(0.12))
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(appState.isMuted ? "Reativar microfone" : "Silenciar microfone")
     }
 
     private var backspaceButton: some View {
