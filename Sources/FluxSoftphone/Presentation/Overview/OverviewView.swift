@@ -38,7 +38,7 @@ struct OverviewView: View {
     private var brandHeader: some View {
         GlassCard {
             HStack(spacing: 14) {
-                BrandLogoView(fallbackName: appState.brand.appName, size: 52)
+                BrandLogoView(fallbackName: appState.brand.appName, size: 62)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(themeStore.theme.displayBrandName(fallback: appState.brand.appName))
                         .font(.title2.weight(.semibold))

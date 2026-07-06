@@ -47,6 +47,10 @@ public actor NativeSIPClient: SIPClientProtocol {
         var session: CallSession
         var dialog: SIPDialog
         var media: (any MediaSessionProtocol)?
+        /// RTP já rodando (early media no 183 ou atendimento) — o próximo
+        /// SDP vira `retarget`, nunca um segundo `start` (que duplicaria
+        /// engine e timers da sessão de mídia).
+        var mediaStarted = false
         var negotiatedCodec: G711Codec?
         var remoteMedia: SDP.RemoteMedia?
         /// Branch do INVITE de saída (para CANCEL) ou o request de entrada
@@ -277,10 +281,52 @@ public actor NativeSIPClient: SIPClientProtocol {
             if let account { Task { await self.sendCancel(account: account) } }
             return
         }
-        guard context.session.state == .dialing else { return }
-        context.session = context.session.with(state: .ringing)
+
+        // Early media (RFC 3960): 183/180 com SDP carrega o ringback/anúncio
+        // gerado pelo servidor ("tratamento de mídia" no softswitch) ANTES do
+        // atendimento. Sem tocar isso, o chamador fica em silêncio até o 200.
+        // Pode chegar em qualquer provisional, inclusive depois do primeiro.
+        if !context.mediaStarted,
+           !response.body.isEmpty,
+           let media = context.media,
+           let remote = SDP.parseRemoteMedia(response.body),
+           let codec = remote.negotiatedCodec {
+            context.mediaStarted = true
+            context.negotiatedCodec = codec
+            context.remoteMedia = remote
+            log("← \(response.statusCode) com SDP — early media \(codec.sdpName) de \(remote.connectionAddress):\(remote.audioPort)")
+            Task {
+                do {
+                    try await media.start(
+                        remoteHost: remote.connectionAddress,
+                        remotePort: remote.audioPort,
+                        codec: codec
+                    )
+                    await media.setTelephoneEventPayloadType(remote.telephoneEventPayloadType)
+                } catch {
+                    // Early media é conforto, não requisito: a chamada segue
+                    // e o 200 OK tenta a mídia de novo (start, não retarget).
+                    self.log("falha ao tocar early media: \(error)")
+                    self.markEarlyMediaFailed()
+                }
+            }
+        } else if response.statusCode == 183, response.body.isEmpty {
+            log("← 183 sem SDP — servidor não ofereceu early media")
+        }
+
+        if context.session.state == .dialing {
+            context.session = context.session.with(state: .ringing)
+            yieldCall(context.session)
+        }
         call = context
-        yieldCall(context.session)
+    }
+
+    /// Reverte a marca de mídia iniciada quando o start do early media falha
+    /// — o 200 OK então faz o `start` normal (caminho validado).
+    private func markEarlyMediaFailed() {
+        guard var context = call else { return }
+        context.mediaStarted = false
+        call = context
     }
 
     private func handleInviteFinalResponse(
@@ -331,11 +377,22 @@ public actor NativeSIPClient: SIPClientProtocol {
                 return
             }
             do {
-                try await call?.media?.start(
-                    remoteHost: remote.connectionAddress,
-                    remotePort: remote.audioPort,
-                    codec: codec
-                )
+                // Early media já ligou o RTP no 183? O 200 só REDIRECIONA o
+                // fluxo (destino/codec podem mudar no atendimento) — um
+                // segundo start duplicaria engine e timers.
+                if call?.mediaStarted == true {
+                    try await call?.media?.retarget(
+                        remoteHost: remote.connectionAddress,
+                        remotePort: remote.audioPort,
+                        codec: codec
+                    )
+                } else {
+                    try await call?.media?.start(
+                        remoteHost: remote.connectionAddress,
+                        remotePort: remote.audioPort,
+                        codec: codec
+                    )
+                }
             } catch {
                 AppLog.sip.error("Falha ao iniciar mídia: \(String(describing: error), privacy: .public)")
                 log("falha ao iniciar mídia RTP: \(error)")
@@ -344,6 +401,7 @@ public actor NativeSIPClient: SIPClientProtocol {
                 return
             }
             if var active = call {
+                active.mediaStarted = true
                 active.negotiatedCodec = codec
                 active.remoteMedia = remote
                 active.session = active.session.with(state: .active, connectedAt: Date())
@@ -521,6 +579,7 @@ public actor NativeSIPClient: SIPClientProtocol {
         }
 
         context.media = media
+        context.mediaStarted = true
         context.negotiatedCodec = codec
         context.remoteMedia = remote
         context.incomingOkResponse = ok // para retransmitir se o ACK se perder

@@ -395,6 +395,25 @@ Pendências da frente de áudio: G.729 (decisão de negócio — licença comerc
 bcg729 vs transcodificação no PABX vs Opus), AGC/clipping em observação,
 preferência de dispositivo dos Ajustes ainda não aplicada ao engine.
 
+## Early media (ringback do servidor) — 2026-07-05
+
+Campo: sem ringback no softswitch wholesale mesmo com "tratamento de mídia"
+ligado (MicroSIP com a mesma conta ouvia). Causa: o softswitch entrega o
+ringback como **early media** (183 Session Progress com SDP + RTP antes do
+atendimento) e a engine ignorava o corpo dos provisionais — mídia só no 200.
+
+- `handleInviteProvisional`: 183/180 com SDP liga o RTP imediatamente
+  (RFC 3960) — flag `mediaStarted` no contexto da chamada.
+- 200 OK com mídia já rodando vira `retarget` (nunca segundo `start`, que
+  duplicaria engine/timers da sessão).
+- Falha no start do early media não derruba a chamada: reverte a flag e o
+  200 faz o start normal (caminho validado).
+- Diagnóstico: "← 183 com SDP — early media PCMU de X:Y" / "← 183 sem SDP".
+- Teste de regressão: servidor fake com 183+SDP (porta própria) → start
+  único no early media + retarget para a mídia definitiva no 200. 132 testes.
+
+Também: logo do aparelho 20% maior (discador 46 pt, preview 41, visão 62).
+
 ## Próximo ciclo
 
 1. **Validar em campo**: chamada de entrada (celular → ramal do app) e DTMF contra URA real (ex.: ligar para o atendimento e navegar o menu).

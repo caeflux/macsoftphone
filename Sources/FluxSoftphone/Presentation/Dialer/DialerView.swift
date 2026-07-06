@@ -140,7 +140,7 @@ struct DialerView: View {
 
     private var brandHeader: some View {
         VStack(spacing: 6) {
-            BrandLogoView(fallbackName: appState.brand.appName, size: 38)
+            BrandLogoView(fallbackName: appState.brand.appName, size: 46)
             Text(wlTheme.displayBrandName(fallback: appState.brand.appName))
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(theme.textSecondary)

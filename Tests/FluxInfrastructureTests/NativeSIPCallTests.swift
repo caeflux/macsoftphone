@@ -12,6 +12,8 @@ private final class FakeMediaSession: MediaSessionProtocol, @unchecked Sendable 
     private let state = OSAllocatedUnfairLock(initialState: State())
     struct State {
         var started = false
+        var startCount = 0
+        var startPort: Int?
         var stopped = false
         var muted = false
         var codec: G711Codec?
@@ -23,7 +25,12 @@ private final class FakeMediaSession: MediaSessionProtocol, @unchecked Sendable 
     init(port: Int = 41234) { localRTPPort = port }
 
     func start(remoteHost: String, remotePort: Int, codec: G711Codec) async throws {
-        state.withLock { $0.started = true; $0.codec = codec }
+        state.withLock {
+            $0.started = true
+            $0.startCount += 1
+            $0.startPort = remotePort
+            $0.codec = codec
+        }
     }
     func retarget(remoteHost: String, remotePort: Int, codec: G711Codec) async throws {
         state.withLock { $0.retargets.append((remoteHost, remotePort)); $0.codec = codec }
@@ -40,6 +47,8 @@ private final class FakeMediaSession: MediaSessionProtocol, @unchecked Sendable 
     func stop() async { state.withLock { $0.stopped = true } }
 
     var didStart: Bool { state.withLock { $0.started } }
+    var startCount: Int { state.withLock { $0.startCount } }
+    var startPort: Int? { state.withLock { $0.startPort } }
     var didStop: Bool { state.withLock { $0.stopped } }
     var retargets: [(host: String, port: Int)] { state.withLock { $0.retargets } }
     var telephoneEventPT: Int? { state.withLock { $0.telephoneEventPT } }
@@ -109,6 +118,11 @@ private final class FakeSIPCallServer: @unchecked Sendable {
     /// Headers Record-Route a incluir nas respostas ao INVITE (simula proxy
     /// que faz record-routing, como o do PABX que causava "ACK Timeout").
     let recordRoutes = OSAllocatedUnfairLock(initialState: [String]())
+
+    /// Quando ligado, o INVITE recebe 183 Session Progress COM SDP (porta
+    /// 5008) antes do 180/200 — simula softswitch com tratamento de mídia
+    /// (early media/ringback do servidor).
+    let earlyMedia = OSAllocatedUnfairLock(initialState: false)
 
     /// O servidor origina um INVITE para o cliente (chamada de entrada),
     /// pela mesma conexão UDP usada no registro.
@@ -225,6 +239,20 @@ private final class FakeSIPCallServer: @unchecked Sendable {
                 .joined(separator: "\r\n")
             var okExtra = "Contact: <sip:server@127.0.0.1>"
             if !routeLines.isEmpty { okExtra = routeLines + "\r\n" + okExtra }
+            if earlyMedia.withLock({ $0 }) {
+                // Softswitch com tratamento de mídia: ringback via 183+SDP
+                // numa porta DIFERENTE da mídia definitiva do 200.
+                let earlySDP = SDP.audioDescription(
+                    sessionId: "srvearly", host: "127.0.0.1", rtpPort: 5008,
+                    codecs: [.pcmu]
+                )
+                return [
+                    base("100 Trying"),
+                    base("183 Session Progress", toTag: "srvtag", body: earlySDP),
+                    base("180 Ringing", toTag: "srvtag"),
+                    base("200 OK", toTag: "srvtag", extra: okExtra, body: sdp)
+                ]
+            }
             return [
                 base("100 Trying"),
                 base("180 Ringing", toTag: "srvtag"),
@@ -300,6 +328,43 @@ struct NativeSIPCallTests {
             try await Task.sleep(for: .milliseconds(50))
         }
         #expect(stopped)
+    }
+
+    @Test("early media: 183 com SDP liga o RTP no ringback; 200 OK retargeta sem segundo start")
+    func earlyMediaPlaysRingbackAndRetargetsOnAnswer() async throws {
+        let server = try FakeSIPCallServer(username: "1001", password: "s3nh4!")
+        server.earlyMedia.withLock { $0 = true }
+        try await server.start()
+        defer { server.stop() }
+        let media = FakeMediaSession()
+
+        let client = try await registered(server: server, media: media)
+        var iterator = client.events.makeAsyncIterator()
+
+        _ = try await client.makeCall(to: "2002")
+
+        var becameActive = false
+        for _ in 0..<40 {
+            guard let event = await iterator.next() else { break }
+            if case .callStateChanged(let call) = event, call.state == .active {
+                becameActive = true
+                break
+            }
+        }
+        #expect(becameActive)
+
+        // Start ÚNICO, no destino do 183 (porta 5008 = early media).
+        #expect(media.startCount == 1)
+        #expect(media.startPort == 5008)
+        // O 200 OK redireciona para a mídia definitiva (porta 5004) e
+        // negocia o telephone-event do SDP final.
+        var retargeted = false
+        for _ in 0..<20 {
+            if media.retargets.contains(where: { $0.port == 5004 }) { retargeted = true; break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(retargeted, "200 OK deveria retargetar a mídia para a porta definitiva")
+        #expect(media.telephoneEventPT == 101)
     }
 
     @Test("makeCall sem registro é recusada; destino vazio idem")
