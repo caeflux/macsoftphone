@@ -154,6 +154,13 @@ struct DialerView: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Status SIP: \(RegistrationStatePresentation.label(for: appState.registrationState))")
+
+            // Andamento da chamada (discando/chamando/duração), discreto,
+            // logo abaixo do status de registro — substitui o aviso grande
+            // que ficava no meio do aparelho (redundante com a barra de
+            // chamada ativa, sobretudo no modo compacto).
+            callProgressLine
+                .frame(height: 14)
         }
         .frame(maxWidth: .infinity)
         .background {
@@ -163,6 +170,28 @@ struct DialerView: View {
                 WindowChromeConfigurator.WindowDragHandle()
                     .padding(.horizontal, 44)
             }
+        }
+    }
+
+    /// Estado da chamada em andamento (exceto `.incoming`, que já aparece em
+    /// destaque no `IncomingCallOverlay`) — duração corrente quando ativa,
+    /// rótulo do estado nos demais casos ao vivo.
+    @ViewBuilder
+    private var callProgressLine: some View {
+        if let call = appState.activeCall, call.state.isLive, call.state != .incoming {
+            if call.state == .active, let connectedAt = call.connectedAt {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(DurationFormatter.format(context.date.timeIntervalSince(connectedAt)))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(theme.textSecondary)
+                }
+            } else {
+                Text(CallStatePresentation.label(for: call.state))
+                    .font(.caption2)
+                    .foregroundStyle(theme.textSecondary)
+            }
+        } else {
+            Color.clear
         }
     }
 
@@ -201,8 +230,6 @@ struct DialerView: View {
                             .foregroundStyle(theme.textPrimary)
                     }
                 }
-            } else if hasLiveCall {
-                hint("Chamada em andamento — use a barra inferior para controlá-la.")
             } else if !isRegistered {
                 hint("Registre a conta para fazer chamadas.")
             } else if let message = appState.userMessage {
@@ -221,15 +248,24 @@ struct DialerView: View {
         ["*", "0", "#"]
     ]
 
+    /// Dimensões do teclado — compartilhadas com a linha de controles
+    /// (backspace + ligar/encerrar) para os dois ocuparem a MESMA largura
+    /// horizontal do teclado completo (3 colunas).
+    private static let keyWidth: CGFloat = 62
+    private static let keySpacing: CGFloat = 9
+    private static var keypadWidth: CGFloat {
+        keyWidth * 3 + keySpacing * 2
+    }
+
     /// Raio das teclas proporcional ao raio do shell configurado no tema.
     private var keyCornerRadius: CGFloat {
         min(wlTheme.cornerRadius * 0.4, 16)
     }
 
     private var keypad: some View {
-        VStack(spacing: 9) {
+        VStack(spacing: Self.keySpacing) {
             ForEach(Self.keys, id: \.self) { row in
-                HStack(spacing: 9) {
+                HStack(spacing: Self.keySpacing) {
                     ForEach(row, id: \.self) { key in
                         keypadButton(key)
                     }
@@ -252,7 +288,7 @@ struct DialerView: View {
             Text(key)
                 .font(.title3.weight(.medium))
                 .foregroundStyle(theme.textPrimary)
-                .frame(width: 62, height: 48)
+                .frame(width: Self.keyWidth, height: 48)
                 // Preenchimento derivado da cor de texto: adapta-se a tema
                 // claro ou escuro mantendo as teclas visíveis sobre o vidro.
                 .background(
@@ -270,42 +306,71 @@ struct DialerView: View {
 
     // MARK: - Ações
 
-    private var controls: some View {
-        HStack(spacing: 12) {
-            Button {
-                if !number.isEmpty { appState.dialerNumber.removeLast() }
-            } label: {
-                Image(systemName: "delete.left")
-                    .font(.title3)
-                    .foregroundStyle(theme.textPrimary)
-                    .frame(width: 62, height: 42)
-                    .background(
-                        wlTheme.text.opacity(0.07),
-                        in: RoundedRectangle(cornerRadius: keyCornerRadius, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: keyCornerRadius, style: .continuous)
-                            .strokeBorder(wlTheme.text.opacity(0.12))
-                    }
-            }
-            .buttonStyle(.plain)
-            // Em modo DTMF não há o que apagar — dígito enviado é enviado.
-            .disabled(number.isEmpty || isDTMFMode)
-            .opacity(number.isEmpty || isDTMFMode ? 0.4 : 1)
-            .accessibilityLabel("Apagar último dígito")
+    /// Há uma chamada para encerrar? (`.incoming` fica de fora — é tratada
+    /// pelo `IncomingCallOverlay`, com Atender/Recusar; encerrar ali seria a
+    /// operação SIP errada.)
+    private var isHangupEligible: Bool {
+        guard let call = appState.activeCall else { return false }
+        return call.state.isLive && call.state != .incoming
+    }
 
-            Button {
-                call()
-            } label: {
-                Label("Ligar", systemImage: "phone.fill")
-                    .font(.headline)
-                    .frame(width: 140, height: 42)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(theme.success)
-            .disabled(!canCall)
-            .accessibilityLabel("Ligar para o número digitado")
+    /// Backspace e Ligar/Encerrar dividem a MESMA largura do teclado
+    /// completo, em partes iguais — o botão de ação dobra como "Encerrar"
+    /// (vermelho) sempre que há uma chamada em andamento, no lugar de ficar
+    /// cinza e inerte como antes.
+    private var controls: some View {
+        HStack(spacing: Self.keySpacing) {
+            backspaceButton
+            callActionButton
         }
+        .frame(width: Self.keypadWidth)
+    }
+
+    private var backspaceButton: some View {
+        Button {
+            if !number.isEmpty { appState.dialerNumber.removeLast() }
+        } label: {
+            Image(systemName: "delete.left")
+                .font(.title3)
+                .foregroundStyle(theme.textPrimary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+                .background(
+                    wlTheme.text.opacity(0.07),
+                    in: RoundedRectangle(cornerRadius: keyCornerRadius, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: keyCornerRadius, style: .continuous)
+                        .strokeBorder(wlTheme.text.opacity(0.12))
+                }
+        }
+        .buttonStyle(.plain)
+        // Em modo DTMF não há o que apagar — dígito enviado é enviado.
+        .disabled(number.isEmpty || isDTMFMode)
+        .opacity(number.isEmpty || isDTMFMode ? 0.4 : 1)
+        .accessibilityLabel("Apagar último dígito")
+    }
+
+    private var callActionButton: some View {
+        Button {
+            if isHangupEligible {
+                appState.hangupActiveCall()
+            } else {
+                call()
+            }
+        } label: {
+            Label(
+                isHangupEligible ? "Encerrar" : "Ligar",
+                systemImage: isHangupEligible ? "phone.down.fill" : "phone.fill"
+            )
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(isHangupEligible ? theme.danger : theme.success)
+        .disabled(!isHangupEligible && !canCall)
+        .accessibilityLabel(isHangupEligible ? "Encerrar chamada" : "Ligar para o número digitado")
     }
 
     private func call() {
