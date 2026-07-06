@@ -12,6 +12,14 @@ struct FluxSoftphoneApp: App {
                 .environmentObject(appState)
                 .environmentObject(themeStore)
                 .task { appState.start() }
+                // Ícone do Dock acompanha o logo/cor do tema, ao vivo.
+                .task { DockIconApplier.apply(theme: themeStore.theme, logoData: themeStore.logoData) }
+                .onChange(of: themeStore.logoData) {
+                    DockIconApplier.apply(theme: themeStore.theme, logoData: themeStore.logoData)
+                }
+                .onChange(of: themeStore.theme.primaryColor) {
+                    DockIconApplier.apply(theme: themeStore.theme, logoData: themeStore.logoData)
+                }
                 // O tema white label define apenas paleta clara; sem forçar
                 // a aparência, o dark mode do sistema pinta textos padrão de
                 // branco sobre as superfícies claras do tema (texto invisível).
