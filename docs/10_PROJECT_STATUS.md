@@ -414,6 +414,40 @@ atendimento) e a engine ignorava o corpo dos provisionais — mídia só no 200.
 
 Também: logo do aparelho 20% maior (discador 46 pt, preview 41, visão 62).
 
+## Ícone do Dock dinâmico + ajustes de tamanho do logo — 2026-07-06
+
+- `DockIconApplier` (`Sources/FluxSoftphone/Presentation/Support/DockIconApplier.swift`):
+  compõe o logo do tema num squircle preenchido com a cor primária (margem 5%,
+  cantos a 22,5% do lado — proporções de ícone macOS) e aplica via
+  `NSApp.applicationIconImage`. Atualiza ao vivo quando o logo ou a cor
+  primária mudam na Aparência; sem logo customizado, volta ao ícone do
+  bundle. Cobre só o Dock do app EM EXECUÇÃO — o ícone estático do `.app`
+  (Finder/Launchpad/DMG) é por marca no pipeline de release (Ciclo 12).
+- Logo maior por pedido de campo, em rodadas sucessivas: +20% no discador
+  (38→46 pt), depois +48% sobre esse tamanho no ícone do Dock (65%→96% do
+  quadro do ícone) e no discador (46→68 pt), por fim o logo do discador foi
+  dobrado (68→136 pt) — ficou bem mais presente no aparelho. Preview da
+  Aparência escalado na mesma proporção a cada rodada (108 pt no final).
+
+## Discador: status de chamada discreto + botão Ligar/Encerrar unificado — 2026-07-06
+
+Refinamento de UX pedido em campo: o aviso "Chamada em andamento — use a
+barra inferior para controlá-la" no meio do aparelho soava estranho, redundante
+com a barra de chamada ativa flutuante — mais evidente ainda no modo compacto.
+
+- Andamento da chamada (rótulo do estado, ou a duração corrente ao vivo
+  quando ativa) migrou para uma linha discreta abaixo do status "Registrado"
+  no header (`callProgressLine`); `.incoming` fica de fora — já tem destaque
+  próprio no `IncomingCallOverlay`.
+- Botão de ação único: "Ligar" (verde) sem chamada, vira "Encerrar"
+  (vermelho, funcional) sempre que há uma chamada em andamento — antes
+  ficava cinza e inerte durante a chamada, só dava para encerrar pela barra.
+- Backspace e Ligar/Encerrar passam a dividir, em partes iguais, a MESMA
+  largura horizontal do teclado completo (204 pt = 3 teclas de 62 pt + 2 vãos
+  de 9 pt) — constantes de layout compartilhadas entre teclado e controles.
+
+Nenhuma mudança em lógica de discagem/DTMF/SIP. 132 testes.
+
 ## Próximo ciclo
 
 1. **Validar em campo**: chamada de entrada (celular → ramal do app). DTMF contra URA real ✅ validado em 2026-07-05 (navegação de menu com o teclado contextual).

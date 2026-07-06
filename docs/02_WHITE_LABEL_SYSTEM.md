@@ -129,6 +129,10 @@ camada de personalização editável em runtime:
   verde de atender e vermelho de encerrar são convenção de telefonia.
 - **Visual**: `GlassPhoneShell`/`GlassCard`/`ThemedBackgroundView`/`BrandLogoView`
   aplicam o glassmorphism; o discador vive dentro do shell em formato smartphone.
+- **Ícone do Dock**: `DockIconApplier` compõe o logo do tema num squircle com
+  a cor primária e aplica como ícone do app em execução (`NSApp.applicationIconImage`),
+  ao vivo a cada mudança de logo/cor. Cobre só o Dock; o ícone estático do
+  `.app` (Finder/Launchpad) segue por marca no pipeline de release (Ciclo 12).
 - **Export/import**: `ThemeStore.exportThemeJSON()`/`importTheme(from:)` são o
   contrato JSON para distribuir temas por tenant (UI de export/import é etapa
   futura; imagens não vão no export v1).
