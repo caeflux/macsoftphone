@@ -45,7 +45,7 @@ struct ThemePreviewView: View {
         VStack(spacing: 14) {
             // Header: logo + marca + status de registro.
             VStack(spacing: 6) {
-                BrandLogoView(fallbackName: appState.brand.appName, size: 41)
+                BrandLogoView(fallbackName: appState.brand.appName, size: 61)
                 Text(theme.displayBrandName(fallback: appState.brand.appName))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(theme.text)

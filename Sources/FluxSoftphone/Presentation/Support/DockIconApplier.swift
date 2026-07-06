@@ -38,10 +38,11 @@ enum DockIconApplier {
         background.setFill()
         path.fill()
 
-        // Logo centrado em até 65% do quadro, proporção preservada.
+        // Logo centrado em até 96% do quadro (pedido de campo: +48% sobre os
+        // 65% originais), proporção preservada — quase full-bleed no squircle.
         let logoSize = logo.size
         guard logoSize.width > 0, logoSize.height > 0 else { return image }
-        let maxSide = iconRect.width * 0.65
+        let maxSide = iconRect.width * 0.96
         let scale = min(maxSide / logoSize.width, maxSide / logoSize.height)
         let drawSize = NSSize(width: logoSize.width * scale, height: logoSize.height * scale)
         let origin = NSPoint(
