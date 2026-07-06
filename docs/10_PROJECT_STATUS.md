@@ -448,6 +448,19 @@ com a barra de chamada ativa flutuante — mais evidente ainda no modo compacto.
 
 Nenhuma mudança em lógica de discagem/DTMF/SIP. 132 testes.
 
+### Ajuste de campo: barra de chamada some do modo compacto
+
+Mesmo com o status discreto e o botão unificado, a `ActiveCallBar` continuava
+abrindo embaixo do discador no modo compacto — ali ela só duplicava o que o
+aparelho já mostrava (única tela é o discador; no modo completo ela cobre
+qualquer seção da janela e continua fazendo sentido, não foi tocada).
+
+- `CompactModeView` não renderiza mais `ActiveCallBar`.
+- Mute (única função que só existia na barra) migrou para o discador: durante
+  a chamada ativa (modo DTMF), o slot do backspace — inútil nesse momento —
+  vira o toggle de mute, mesmo tamanho/estilo; fora da chamada volta a ser
+  backspace.
+
 ## Próximo ciclo
 
 1. **Validar em campo**: chamada de entrada (celular → ramal do app). DTMF contra URA real ✅ validado em 2026-07-05 (navegação de menu com o teclado contextual).
